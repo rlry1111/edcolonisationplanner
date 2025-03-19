@@ -321,6 +321,16 @@ def on_focus_out(event, var):
     value = event.widget.get().lower()
     var.set(value)
 
+def set_color_if_negative(variable, entry, color="red"):
+    original_color = entry.cget("fg")
+    def callback(var, index, mode):
+        val = variable.get()
+        if val < 0:
+            entry.config(fg=color)
+        else:
+            entry.config(fg=original_color)
+    variable.trace_add("write", callback)
+
 listofscores = ["initial population increase", "max population increase", "security", "tech level", "wealth", "standard of living", "development level", "construction cost"]
 
 root = tkinter.Tk()
@@ -363,6 +373,7 @@ for i, name in enumerate(listofscores):
     result = tkinter.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=tkinter.RIGHT)
     result.grid(column=3, row=2+i, padx=5)
     result.config(state="readonly")
+    set_color_if_negative(resultvars[name], result)
 
 orbitalfacilityslotsinput = tkinter.IntVar()
 groundfacilityslotsinput = tkinter.IntVar()
