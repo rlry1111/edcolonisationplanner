@@ -307,7 +307,7 @@ def solve():
                     printresult(f"{name} = {value}")
 
     for score in listofscores:
-        resultvars[score].set(pulp.value(systemscores[score]))
+        resultvars[score].set(int(pulp.value(systemscores[score])))
 
 def printresult(text):
     current_text = resultlabel.cget("text")
@@ -330,7 +330,7 @@ root.geometry("800x1000")
 maximizeinput = tkinter.StringVar()
 frame = tkinter.Frame(root)
 frame.pack(pady=5)
-label = tkinter.Label(frame, text="Select what you are trying to maximise:", font=("calibri", 12))
+label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("calibri", 12))
 label.pack(side="left")
 dropdown = tkinter.OptionMenu(frame, maximizeinput, *listofscores)
 dropdown.pack(side="left")
@@ -353,16 +353,16 @@ for i, name in enumerate(listofscores):
 
     label = tkinter.Label(constraint_frame, text=name,font=("calibri", 12))
     label.grid(column=0, row=2+i)
-    entry_min = tkinter.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10)
-    entry_max = tkinter.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10)
+    entry_min = tkinter.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
+    entry_max = tkinter.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
     entry_min.grid(column=1, row=2+i)
     entry_max.grid(column=2, row=2+i)
     entry_min.bind("<FocusOut>", lambda event, var=minvars[name]: on_focus_out(event, var))
     entry_max.bind("<FocusOut>", lambda event, var=maxvars[name]: on_focus_out(event, var))
 
-    result = tkinter.Entry(constraint_frame, textvariable=resultvars[name], width=10)
+    result = tkinter.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=tkinter.RIGHT)
     result.grid(column=3, row=2+i, padx=5)
-    result.config(state=tkinter.DISABLED)
+    result.config(state="readonly")
 
 orbitalfacilityslotsinput = tkinter.IntVar()
 groundfacilityslotsinput = tkinter.IntVar()
