@@ -36,18 +36,15 @@ def solve():
     initial_construction_cost = 18988
     if idk == "orbis" or idk == "ocellus":
         minorbis = 1
-        inittier3conpoints += 6
         initial_construction_cost = 209122
     elif idk == "asteroid base":
         minasteroidbase  = 1
-        inittier2conpoints += 3
         initial_construction_cost = 53723
         if asteroidslots == 0:
             resultlabel.config(text="Error: your starting station is an asteroid base but there are no slots for asteroid bases to be built")
             return None
     elif idk == "coriolis":
         mincoriolis = 1
-        inittier2conpoints += 3
         initial_construction_cost = 53723
     elif idk == "commercial outpost":
         mincommercialoutpost = 1
@@ -67,19 +64,34 @@ def solve():
     else:
         resultlabel.config(text="Error: One or more inputs are blank")
         return None
+
+    #problem
+    direction = pulp.LpMinimize if maximize == "construction cost" else pulp.LpMaximize
+    prob = pulp.LpProblem("optimal_system_colonization_layout", direction)
+
     #create all the variables for each of the facilities
-    #orbital facilities
-    coriolis_before_increase = pulp.LpVariable('Coriolis_First', lowBound = 0, cat='Integer')
-    orbis_before_increase = pulp.LpVariable('Orbis_or_Ocellus_First', lowBound = 0, cat='Integer')
-    asteroidbase_before_increase = pulp.LpVariable('Asteroid_Base_First', lowBound = 0, upBound = asteroidslots, cat='Integer')
-    coriolis_after_increase = pulp.LpVariable('Coriolis_Second', lowBound = 0, cat='Integer')
-    orbis_after_increase = pulp.LpVariable('Orbis_or_Ocellus_Second', lowBound = 0, cat='Integer')
-    asteroidbase_after_increase = pulp.LpVariable('Asteroid_Base_Second', lowBound = 0, upBound = asteroidslots, cat='Integer')
 
-    coriolis = coriolis_before_increase + coriolis_after_increase + mincoriolis
-    orbis = orbis_before_increase + orbis_after_increase + minorbis
-    asteroidbase = asteroidbase_before_increase + asteroidbase_after_increase + minasteroidbase
+    # orbital and planetary ports, subject to cost increase
+    # Speculation for how construction points increase based on
+    # https://old.reddit.com/r/EliteDangerous/comments/1jfm0y6/psa_construction_points_costs_triple_after_third/
+    max_nb_ports = 20 # not sure how to find the correct value for this
+    coriolis_vars      = [ pulp.LpVariable(f"Coriolis_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+    orbis_vars         = [ pulp.LpVariable(f"Orbis_or_Ocellus_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+    asteroidbase_vars  = [ pulp.LpVariable(f"Asteroid_Base_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+    planetaryport_vars = [ pulp.LpVariable(f"Planetary_Port_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
 
+    coriolis = pulp.lpSum(coriolis_vars) + mincoriolis
+    orbis = pulp.lpSum(orbis_vars) + minorbis
+    asteroidbase = pulp.lpSum(asteroidbase_vars) + minasteroidbase
+    planetaryport = pulp.lpSum(planetaryport_vars)
+
+    prob += asteroidbase <= asteroidslots, "asteroid slots"
+    for k in range(max_nb_ports):
+        prob += coriolis_vars[k] + orbis_vars[k] + asteroidbase_vars[k] + planetaryport_vars[k] <= 1, f"port ordering limit {k+1}"
+        if k > 0:
+            prob += coriolis_vars[k] + orbis_vars[k] + asteroidbase_vars[k] + planetaryport_vars[k] <= coriolis_vars[k-1] + orbis_vars[k-1] + asteroidbase_vars[k-1] + planetaryport_vars[k-1], f"port ordering consistency {k+1}"
+
+    # orbital facilities
     commercialoutpost = pulp.LpVariable('Commercial_Outpost', lowBound = mincommercialoutpost, cat='Integer')
     industrialoutpost = pulp.LpVariable('Industrial_Outpost', lowBound = minindustrialoutpost, cat='Integer')
     civilianoutpost = pulp.LpVariable('Civilian_Outpost', lowBound = mincivilianoutpost, cat='Integer')
@@ -103,10 +115,6 @@ def solve():
     civilianplanetaryoutpost = pulp.LpVariable('Civilian_Planetary_Outpost', lowBound = 0, cat='Integer')
     industrialplanetaryoutpost = pulp.LpVariable('Industrial_Planetary_Outpost', lowBound = 0, cat='Integer')
     scientificplanetaryoutpost = pulp.LpVariable('Scientific_Planetary_Outpost', lowBound = 0, cat='Integer')
-
-    planetaryport_before_increase = pulp.LpVariable('Planetary_Port_First', lowBound = 0, cat='Integer')
-    planetaryport_after_increase = pulp.LpVariable('Planetary_Port_Second', lowBound = 0, cat='Integer')
-    planetaryport = planetaryport_before_increase + planetaryport_after_increase
 
     smallagriculturalsettlement = pulp.LpVariable('Small_Agricultural_Settlement', lowBound = 0, cat='Integer')
     mediumagriculturalsettlement = pulp.LpVariable('Medium_Agricultural_Settlement', lowBound = 0, cat='Integer')
@@ -135,9 +143,6 @@ def solve():
     refineryhub = pulp.LpVariable('Refinery_Hub', lowBound = 0, cat='Integer')
     hightechhub = pulp.LpVariable('Hightech_Hub', lowBound = 0, cat='Integer')
     industrialhub = pulp.LpVariable('Industrial_Hub', lowBound = 0, cat='Integer')
-    #problem
-    direction = pulp.LpMinimize if maximize == "construction cost" else pulp.LpMaximize
-    prob = pulp.LpProblem("optimal_system_colonization_layout", direction)
 
     # compute system scores
     systemscores = {}
@@ -170,19 +175,12 @@ def solve():
     #number of slots
     prob += coriolis + orbis + commercialoutpost + industrialoutpost + civilianoutpost + scientificoutpost + militaryoutpost + satellite + communicationstation + spacefarm + miningoutpost + relaystation + military + securitystation + government + medical + researchstation + tourist + bar + asteroidbase + criminaloutpost + piratebase <= orbitalfacilityslots + 1, "orbital facility slots"
     prob += civilianplanetaryoutpost + industrialplanetaryoutpost + scientificplanetaryoutpost + planetaryport + smallagriculturalsettlement + mediumagriculturalsettlement + largeagriculturalsettlement + smallextractionsettlement + mediumextractionsettlement + largeextractionsettlement + smallindustrialsettlement + mediumindustrialsettlement + largeindustrialsettlement + smallmilitarysettlement + mediummilitarysettlement + largemilitarysettlement + smallscientificsettlement + mediumscientificsettlement + largescientificsettlement + smalltourismsettlement + mediumtourismsettlement + largetourismsettlement + extractionhub + civilianhub + explorationhub + outposthub + scientifichub + militaryhub + refineryhub + hightechhub + industrialhub <= groundfacilityslots, "ground facility slots"
-    #construction points
-    prob += (industrialoutpost) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (commercialoutpost) + (miningoutpost) + (communicationstation) + (scientificoutpost) + (militaryoutpost) + (mediumindustrialsettlement) + (smallindustrialsettlement) + (scientificplanetaryoutpost) + (mediumagriculturalsettlement) + (civilianplanetaryoutpost) + (smallagriculturalsettlement) + (mediummilitarysettlement) + (smallmilitarysettlement) + (industrialplanetaryoutpost) + (mediumextractionsettlement) + (smallextractionsettlement) + (-3 * coriolis) + (-1 * government) + (-1 * securitystation) + (-1 * researchstation) + (-1 * tourist) + (-1 * medical) + (-1 * bar) + (-1 * military) + (-1 * largeindustrialsettlement) + (-1 * largescientificsettlement) + (-1 * largemilitarysettlement) + (-1 * largeagriculturalsettlement) + (-1 * largeextractionsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * outposthub) + (-1 * civilianhub) + (-1 * industrialhub) + (-1 * extractionhub) + (-1 * explorationhub) + (-1 * mediumscientificsettlement) + (-1 * smallscientificsettlement) + (-1 * hightechhub) + (-1 * scientifichub) + (-1 * militaryhub) + (-1 * mediumtourismsettlement) + (-1 * smalltourismsettlement) + inittier2conpoints + piratebase + criminaloutpost + (-3 * asteroidbase) + (-2 * coriolis_after_increase) + (-2 * asteroidbase_after_increase) >= 0, "tier 2 construction points"
-    prob += (coriolis) + (government) + (securitystation) + (researchstation) + (tourist) + (medical) + (bar) + (military) + (2 * largeindustrialsettlement) + (2 * largescientificsettlement) + (2 * largemilitarysettlement) + (2 * largeagriculturalsettlement) + (2 * largeextractionsettlement) + (2 * largetourismsettlement) + (refineryhub) + (outposthub) + (civilianhub) + (industrialhub) + (extractionhub) + (explorationhub) + (mediumscientificsettlement) + (smallscientificsettlement) + (hightechhub) + (scientifichub) + (militaryhub) + (mediumtourismsettlement) + (smalltourismsettlement) + (-6 * orbis) + (-6 * planetaryport) + inittier3conpoints + asteroidbase + (-6 * planetaryport_after_increase) + (-6 * orbis_after_increase) >= 0, "tier 3 construction points"
 
-    # at most 2 T2 or T3 before the cost increases
-    prob += coriolis_before_increase + orbis_before_increase + asteroidbase_before_increase + planetaryport_before_increase <= 2
-    # not necessary, but more understandable result: no "after increase" if we do not have at least 2 "before increase"
-    after_increase = pulp.LpVariable("after_increase", cat="Binary")
-    prob += coriolis_after_increase <= orbitalfacilityslots * after_increase
-    prob += orbis_after_increase <= orbitalfacilityslots * after_increase
-    prob += asteroidbase_after_increase <= asteroidslots * after_increase
-    prob += planetaryport_after_increase <= groundfacilityslots * after_increase
-    prob += 2 * after_increase <= (coriolis_before_increase + orbis_before_increase + asteroidbase_before_increase + planetaryport_before_increase)
+    #construction points
+    portsT2constructionpoints = pulp.lpSum( (coriolis_vars[k] + asteroidbase_vars[k]) * max(3, 2*k+1) for k in range(max_nb_ports))
+    portsT3constructionpoints = pulp.lpSum( (orbis_vars[k] + planetaryport_vars[k]) * max(6, 6*k) for k in range(max_nb_ports))
+    prob += (industrialoutpost) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (commercialoutpost) + (miningoutpost) + (communicationstation) + (scientificoutpost) + (militaryoutpost) + (mediumindustrialsettlement) + (smallindustrialsettlement) + (scientificplanetaryoutpost) + (mediumagriculturalsettlement) + (civilianplanetaryoutpost) + (smallagriculturalsettlement) + (mediummilitarysettlement) + (smallmilitarysettlement) + (industrialplanetaryoutpost) + (mediumextractionsettlement) + (smallextractionsettlement) + (-1 * government) + (-1 * securitystation) + (-1 * researchstation) + (-1 * tourist) + (-1 * medical) + (-1 * bar) + (-1 * military) + (-1 * largeindustrialsettlement) + (-1 * largescientificsettlement) + (-1 * largemilitarysettlement) + (-1 * largeagriculturalsettlement) + (-1 * largeextractionsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * outposthub) + (-1 * civilianhub) + (-1 * industrialhub) + (-1 * extractionhub) + (-1 * explorationhub) + (-1 * mediumscientificsettlement) + (-1 * smallscientificsettlement) + (-1 * hightechhub) + (-1 * scientifichub) + (-1 * militaryhub) + (-1 * mediumtourismsettlement) + (-1 * smalltourismsettlement) + piratebase + criminaloutpost - portsT2constructionpoints >= 0, "tier 2 construction points"
+    prob += (coriolis) + (government) + (securitystation) + (researchstation) + (tourist) + (medical) + (bar) + (military) + (2 * largeindustrialsettlement) + (2 * largescientificsettlement) + (2 * largemilitarysettlement) + (2 * largeagriculturalsettlement) + (2 * largeextractionsettlement) + (2 * largetourismsettlement) + (refineryhub) + (outposthub) + (civilianhub) + (industrialhub) + (extractionhub) + (explorationhub) + (mediumscientificsettlement) + (smallscientificsettlement) + (hightechhub) + (scientifichub) + (militaryhub) + (mediumtourismsettlement) + (smalltourismsettlement) + asteroidbase - portsT3constructionpoints >= 0, "tier 3 construction points"
 
     #sort out dependencies for facilities
     b1 = pulp.LpVariable("b1", cat="Binary")
@@ -292,17 +290,17 @@ def solve():
         resultlabel.config(text="Error: There is no possible system arrangement that can fit the conditions you have specified")
         return None
     printresult("Here is what you need to build in the system (including the first station) to achieve these requirements: ")
+    if minorbis > 0:
+        printresult(f"Orbis or Ocellus 0 = {minorbis}")
+    if mincoriolis > 0:
+        printresult(f"Coriolis 0 = {mincoriolis}")
+    if minasteroidbase > 0:
+        printresult(f"Asteroid Base 0 = {minasteroidbase}")
     for v in prob.variables():
         if v.name != "__dummy":
             if not bool(re.fullmatch(r"b\d+", v.name)) and not bool(re.fullmatch(r"any_positive\d+", v.name)) and v.name != "after_increase":
                 value = int(v.varValue)
                 name = v.name.replace("_", " ")
-                if v.name == "Orbis_or_Ocellus_First":
-                    value += minorbis
-                if v.name == "Coriolis_First":
-                    value += mincoriolis
-                if v.name == "Asteroid_Base_First":
-                    value += minasteroidbase
                 if value > 0:
                     printresult(f"{name} = {value}")
 
