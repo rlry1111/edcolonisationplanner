@@ -7,10 +7,11 @@ def solve():
     M = 10000
     inittier2conpoints = 0
     inittier3conpoints = 0
+    initial_construction_cost = 0
     minorbis = 0
     minasteroidbase = 0
     mincoriolis = 0
-    mincommericaloutpost = 0
+    mincommercialoutpost = 0
     minindustrialoutpost = 0
     mincriminaloutpost = 0
     mincivilianoutpost = 0
@@ -19,13 +20,11 @@ def solve():
     maxpiratebase = 0
     maxcriminaloutpost = 0
     maximize = maximizeinput.get()
-    mininitialpopulationincrease = minvars["mininitialpopulationincreaseinput"].get()
-    minmaxpopulationincrease = minvars["minmaxpopulationincreaseinput"].get()
-    minsecurity = minvars["minsecurityinput"].get()
-    mintechlevel = minvars["mintechlevelinput"].get()
-    minwealth = minvars["minwealthinput"].get()
-    minstandardofliving = minvars["minstandardoflivinginput"].get()
-    mindevelopmentlevel = minvars["mindevelopmentlevelinput"].get()
+
+    def convert_maybe(value, default=None):
+        if value != "": return int(value)
+        return default
+
     orbitalfacilityslots = orbitalfacilityslotsinput.get()
     groundfacilityslots = groundfacilityslotsinput.get()
     asteroidslots = asteroidslotsinput.get()
@@ -34,20 +33,21 @@ def solve():
         maxpiratebase = M
         maxcriminaloutpost = M
     idk = firststationinput.get()
+    initial_construction_cost = 18988
     if idk == "orbis" or idk == "ocellus":
         minorbis = 1
-        inittier3conpoints += 6
+        initial_construction_cost = 209122
     elif idk == "asteroid base":
         minasteroidbase  = 1
-        inittier2conpoints += 3
+        initial_construction_cost = 53723
         if asteroidslots == 0:
             resultlabel.config(text="Error: your starting station is an asteroid base but there are no slots for asteroid bases to be built")
             return None
     elif idk == "coriolis":
         mincoriolis = 1
-        inittier2conpoints += 3
-    elif idk == "commerical outpost":
-        mincommericaloutpost = 1
+        initial_construction_cost = 53723
+    elif idk == "commercial outpost":
+        mincommercialoutpost = 1
     elif idk == "industrial outpost":
         minindustrialoutpost = 1
     elif idk == "criminal outpost":
@@ -64,96 +64,124 @@ def solve():
     else:
         resultlabel.config(text="Error: One or more inputs are blank")
         return None
-    #create all the variables for each of the facilities
-    #orbital facilities
-    coriolis = pulp.LpVariable('coriolis', lowBound = mincoriolis, cat='Integer')
-    orbis = pulp.LpVariable('orbis', lowBound = minorbis, cat='Integer')
-    commercialoutpost = pulp.LpVariable('commercialoutpost', lowBound = mincommericaloutpost, cat='Integer')
-    industrialoutpost = pulp.LpVariable('industrialoutpost', lowBound = minindustrialoutpost, cat='Integer')
-    civilianoutpost = pulp.LpVariable('civilianoutpost', lowBound = mincivilianoutpost, cat='Integer')
-    scientificoutpost = pulp.LpVariable('scientificoutpost', lowBound = minscientificoutpost, cat='Integer')
-    militaryoutpost = pulp.LpVariable('militaryoutpost', lowBound = minmilitaryoutpost, cat='Integer')
-    satellite = pulp.LpVariable('satellite', lowBound = 0, cat='Integer')
-    communicationstation = pulp.LpVariable('communicationstation', lowBound = 0, cat='Integer')
-    spacefarm = pulp.LpVariable('spacefarm', lowBound = 0, cat='Integer')
-    miningoutpost = pulp.LpVariable('miningoutpost', lowBound = 0, cat='Integer')
-    relaystation = pulp.LpVariable('relaystation', lowBound = 0, cat='Integer')
-    military = pulp.LpVariable('military', lowBound = 0, cat='Integer')
-    securitystation = pulp.LpVariable('securitystation', lowBound = 0, cat='Integer')
-    government = pulp.LpVariable('government', lowBound = 0, cat='Integer')
-    medical = pulp.LpVariable('medical', lowBound = 0, cat='Integer')
-    researchstation = pulp.LpVariable('researchstation', lowBound = 0, cat='Integer')
-    tourist = pulp.LpVariable('tourist', lowBound = 0, cat='Integer')
-    bar = pulp.LpVariable('bar', lowBound = 0, cat='Integer')
-    asteroidbase = pulp.LpVariable('asteroidbase', lowBound = minasteroidbase, upBound = asteroidslots, cat='Integer')
-    criminaloutpost = pulp.LpVariable('criminaloutpost', lowBound = mincriminaloutpost, upBound = maxcriminaloutpost, cat='Integer')
-    piratebase = pulp.LpVariable('piratebase', lowBound = 0, upBound = maxpiratebase, cat='Integer')
-    #ground facilities
-    civilianplanetaryoutpost = pulp.LpVariable('civilianplanetaryoutpost', lowBound = 0, cat='Integer')
-    industrialplanetaryoutpost = pulp.LpVariable('industrialplanetaryoutpost', lowBound = 0, cat='Integer')
-    scientificplanetaryoutpost = pulp.LpVariable('scientificplanetaryoutpost', lowBound = 0, cat='Integer')
-    planetaryport = pulp.LpVariable('planetaryport', lowBound = 0, cat='Integer')
-    smallagriculturalsettlement = pulp.LpVariable('smallagriculturalsettlement', lowBound = 0, cat='Integer')
-    mediumagriculturalsettlement = pulp.LpVariable('mediumagriculturalsettlement', lowBound = 0, cat='Integer')
-    largeagriculturalsettlement = pulp.LpVariable('largeagriculturalsettlement', lowBound = 0, cat='Integer')
-    smallextractionsettlement = pulp.LpVariable('smallextractionsettlement', lowBound = 0, cat='Integer')
-    mediumextractionsettlement = pulp.LpVariable('mediumextractionsettlement', lowBound = 0, cat='Integer')
-    largeextractionsettlement = pulp.LpVariable('largeextractionsettlement', lowBound = 0, cat='Integer')
-    smallindustrialsettlement = pulp.LpVariable('smallindustrialsettlement', lowBound = 0, cat='Integer')
-    mediumindustrialsettlement = pulp.LpVariable('mediumindustrialsettlement', lowBound = 0, cat='Integer')
-    largeindustrialsettlement = pulp.LpVariable('largeindustrialsettlement', lowBound = 0, cat='Integer')
-    smallmilitarysettlement = pulp.LpVariable('smallmilitarysettlement', lowBound = 0, cat='Integer')
-    mediummilitarysettlement = pulp.LpVariable('mediummilitarysettlement', lowBound = 0, cat='Integer')
-    largemilitarysettlement = pulp.LpVariable('largemilitarysettlement', lowBound = 0, cat='Integer')
-    smallscientificsettlement = pulp.LpVariable('smallscientificsettlement', lowBound = 0, cat='Integer')
-    mediumscientificsettlement = pulp.LpVariable('mediumscientificsettlement', lowBound = 0, cat='Integer')
-    largescientificsettlement = pulp.LpVariable('largescientificsettlement', lowBound = 0, cat='Integer')
-    smalltourismsettlement = pulp.LpVariable('smalltourismsettlement', lowBound = 0, cat='Integer')
-    mediumtourismsettlement = pulp.LpVariable('mediumtourismsettlement', lowBound = 0, cat='Integer')
-    largetourismsettlement = pulp.LpVariable('largetourismsettlement', lowBound = 0, cat='Integer')
-    extractionhub = pulp.LpVariable('extractionhub', lowBound = 0, cat='Integer')
-    civilianhub = pulp.LpVariable('civilianhub', lowBound = 0, cat='Integer')
-    explorationhub = pulp.LpVariable('explorationhub', lowBound = 0, cat='Integer')
-    outposthub = pulp.LpVariable('outposthub', lowBound = 0, cat='Integer')
-    scientifichub = pulp.LpVariable('scientifichub', lowBound = 0, cat='Integer')
-    militaryhub = pulp.LpVariable('militaryhub', lowBound = 0, cat='Integer')
-    refineryhub = pulp.LpVariable('refineryhub', lowBound = 0, cat='Integer')
-    hightechhub = pulp.LpVariable('hightechhub', lowBound = 0, cat='Integer')
-    industrialhub = pulp.LpVariable('industrialhub', lowBound = 0, cat='Integer')
+
     #problem
-    prob = pulp.LpProblem("optimal_system_colonization_layout", pulp.LpMaximize)
+    direction = pulp.LpMinimize if maximize == "construction cost" else pulp.LpMaximize
+    prob = pulp.LpProblem("optimal_system_colonization_layout", direction)
+
+    #create all the variables for each of the facilities
+
+    # orbital and planetary ports, subject to cost increase
+    # Speculation for how construction points increase based on
+    # https://old.reddit.com/r/EliteDangerous/comments/1jfm0y6/psa_construction_points_costs_triple_after_third/
+    max_nb_ports = 20 # not sure how to find the correct value for this
+    coriolis_vars      = [ pulp.LpVariable(f"Coriolis_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+    orbis_vars         = [ pulp.LpVariable(f"Orbis_or_Ocellus_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+    asteroidbase_vars  = [ pulp.LpVariable(f"Asteroid_Base_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+    planetaryport_vars = [ pulp.LpVariable(f"Planetary_Port_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+
+    coriolis = pulp.lpSum(coriolis_vars) + mincoriolis
+    orbis = pulp.lpSum(orbis_vars) + minorbis
+    asteroidbase = pulp.lpSum(asteroidbase_vars) + minasteroidbase
+    planetaryport = pulp.lpSum(planetaryport_vars)
+
+    prob += asteroidbase <= asteroidslots, "asteroid slots"
+    for k in range(max_nb_ports):
+        prob += coriolis_vars[k] + orbis_vars[k] + asteroidbase_vars[k] + planetaryport_vars[k] <= 1, f"port ordering limit {k+1}"
+        if k > 0:
+            prob += coriolis_vars[k] + orbis_vars[k] + asteroidbase_vars[k] + planetaryport_vars[k] <= coriolis_vars[k-1] + orbis_vars[k-1] + asteroidbase_vars[k-1] + planetaryport_vars[k-1], f"port ordering consistency {k+1}"
+
+    # orbital facilities
+    commercialoutpost = pulp.LpVariable('Commercial_Outpost', lowBound = mincommercialoutpost, cat='Integer')
+    industrialoutpost = pulp.LpVariable('Industrial_Outpost', lowBound = minindustrialoutpost, cat='Integer')
+    civilianoutpost = pulp.LpVariable('Civilian_Outpost', lowBound = mincivilianoutpost, cat='Integer')
+    scientificoutpost = pulp.LpVariable('Scientific_Outpost', lowBound = minscientificoutpost, cat='Integer')
+    militaryoutpost = pulp.LpVariable('Military_Outpost', lowBound = minmilitaryoutpost, cat='Integer')
+    satellite = pulp.LpVariable('Satellite', lowBound = 0, cat='Integer')
+    communicationstation = pulp.LpVariable('Communication_Station', lowBound = 0, cat='Integer')
+    spacefarm = pulp.LpVariable('Spacefarm', lowBound = 0, cat='Integer')
+    miningoutpost = pulp.LpVariable('Mining_Outpost', lowBound = 0, cat='Integer')
+    relaystation = pulp.LpVariable('Relay_Station', lowBound = 0, cat='Integer')
+    military = pulp.LpVariable('Military', lowBound = 0, cat='Integer')
+    securitystation = pulp.LpVariable('Security Station', lowBound = 0, cat='Integer')
+    government = pulp.LpVariable('Government', lowBound = 0, cat='Integer')
+    medical = pulp.LpVariable('Medical', lowBound = 0, cat='Integer')
+    researchstation = pulp.LpVariable('Research_Station', lowBound = 0, cat='Integer')
+    tourist = pulp.LpVariable('Tourist', lowBound = 0, cat='Integer')
+    bar = pulp.LpVariable('Space_Bar', lowBound = 0, cat='Integer')
+    criminaloutpost = pulp.LpVariable('Criminal Outpost', lowBound = mincriminaloutpost, upBound = maxcriminaloutpost, cat='Integer')
+    piratebase = pulp.LpVariable('Pirate_Base', lowBound = 0, upBound = maxpiratebase, cat='Integer')
+    #ground facilities
+    civilianplanetaryoutpost = pulp.LpVariable('Civilian_Planetary_Outpost', lowBound = 0, cat='Integer')
+    industrialplanetaryoutpost = pulp.LpVariable('Industrial_Planetary_Outpost', lowBound = 0, cat='Integer')
+    scientificplanetaryoutpost = pulp.LpVariable('Scientific_Planetary_Outpost', lowBound = 0, cat='Integer')
+
+    smallagriculturalsettlement = pulp.LpVariable('Small_Agricultural_Settlement', lowBound = 0, cat='Integer')
+    mediumagriculturalsettlement = pulp.LpVariable('Medium_Agricultural_Settlement', lowBound = 0, cat='Integer')
+    largeagriculturalsettlement = pulp.LpVariable('Large_Agricultural_Settlement', lowBound = 0, cat='Inte!ger')
+    smallextractionsettlement = pulp.LpVariable('Small_Extraction_Settlement', lowBound = 0, cat='Integer')
+    mediumextractionsettlement = pulp.LpVariable('Medium_Extraction_Settlement', lowBound = 0, cat='Integer')
+    largeextractionsettlement = pulp.LpVariable('Large_Extraction_Settlement', lowBound = 0, cat='Integer')
+    smallindustrialsettlement = pulp.LpVariable('Small_Industrial_Settlement', lowBound = 0, cat='Integer')
+    mediumindustrialsettlement = pulp.LpVariable('Medium_Industrial_Settlement', lowBound = 0, cat='Integer')
+    largeindustrialsettlement = pulp.LpVariable('Large_Industrial_Settlement', lowBound = 0, cat='Integer')
+    smallmilitarysettlement = pulp.LpVariable('Small_Military_Settlement', lowBound = 0, cat='Integer')
+    mediummilitarysettlement = pulp.LpVariable('Medium_Military_Settlement', lowBound = 0, cat='Integer')
+    largemilitarysettlement = pulp.LpVariable('Large_Military_Settlement', lowBound = 0, cat='Integer')
+    smallscientificsettlement = pulp.LpVariable('Small_Scientific_Settlement', lowBound = 0, cat='Integer')
+    mediumscientificsettlement = pulp.LpVariable('Medium_Scientific_Settlement', lowBound = 0, cat='Integer')
+    largescientificsettlement = pulp.LpVariable('Large_Scientific_Settlement', lowBound = 0, cat='Integer')
+    smalltourismsettlement = pulp.LpVariable('Small_Tourism_Settlement', lowBound = 0, cat='Integer')
+    mediumtourismsettlement = pulp.LpVariable('Medium_Tourism_Settlement', lowBound = 0, cat='Integer')
+    largetourismsettlement = pulp.LpVariable('Large_Tourism_Settlement', lowBound = 0, cat='Integer')
+    extractionhub = pulp.LpVariable('Extraction_Hub', lowBound = 0, cat='Integer')
+    civilianhub = pulp.LpVariable('Civilian_Hub', lowBound = 0, cat='Integer')
+    explorationhub = pulp.LpVariable('Exploration_Hub', lowBound = 0, cat='Integer')
+    outposthub = pulp.LpVariable('Outpost_Hub', lowBound = 0, cat='Integer')
+    scientifichub = pulp.LpVariable('Scientific_Hub', lowBound = 0, cat='Integer')
+    militaryhub = pulp.LpVariable('Military_Hub', lowBound = 0, cat='Integer')
+    refineryhub = pulp.LpVariable('Refinery_Hub', lowBound = 0, cat='Integer')
+    hightechhub = pulp.LpVariable('Hightech_Hub', lowBound = 0, cat='Integer')
+    industrialhub = pulp.LpVariable('Industrial_Hub', lowBound = 0, cat='Integer')
+
+    # compute system scores
+    systemscores = {}
+    systemscores["initial population increase"] = (5 * orbis) + (coriolis) + (scientificoutpost) + (militaryoutpost) + (10 * planetaryport) + (2 * civilianplanetaryoutpost) + (industrialplanetaryoutpost) + (scientificplanetaryoutpost) + (asteroidbase)
+    systemscores["max population increase"] = (orbis) + (10 * planetaryport)
+    systemscores["security"] = (8 * securitystation) + (6 * military) + (2 * militaryoutpost) + (2 * government) + (communicationstation) + (relaystation) + (-1 * commercialoutpost) + (-1 * civilianoutpost) + (-2 * coriolis) + (-2 * bar) + (-3 * orbis) + (-3 * tourist) + (10 * militaryhub) + (6 * largemilitarysettlement) + (4 * mediummilitarysettlement) + (2 * smallmilitarysettlement) + (-1 * industrialplanetaryoutpost) + (-1 * scientificplanetaryoutpost) + (-1 * smalltourismsettlement) + (-1 * mediumtourismsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * explorationhub) + (-2 * civilianplanetaryoutpost) + (-2 * hightechhub) + (-2 * outposthub) + (-3 * planetaryport) + (-3 * civilianhub) + (-1 * asteroidbase) + (-4 * piratebase) + (-2 * criminaloutpost)
+    systemscores["tech level"] = (8 * researchstation) + (6 * orbis) + (3 * communicationstation) + (3 * scientificoutpost) + (3 * industrialoutpost) + (3 * medical) + (coriolis) + (10 * hightechhub) + (10 * largescientificsettlement) + (10 * scientifichub) + (6 * explorationhub) + (6 * mediumscientificsettlement) + (5 * scientificplanetaryoutpost) + (5 * planetaryport) + (3 * refineryhub) + (3 * smallscientificsettlement) + (3 * industrialhub) + (largeextractionsettlement) + (3 * asteroidbase)
+    systemscores["wealth"] = (7 * orbis) + (6 * tourist) + (3 * miningoutpost) + (2 * coriolis) + (2 * commercialoutpost) + (2 * bar) + (civilianoutpost) + (satellite) + (10 * extractionhub) + (7 * largeextractionsettlement) + (5 * planetaryport) + (5 * mediumextractionsettlement) + (5 * largetourismsettlement) + (5 * refineryhub) + (5 * industrialhub) + (2 * industrialplanetaryoutpost) + (2 * smallextractionsettlement) + (2 * largeindustrialsettlement) + (2 * mediumtourismsettlement) + (smalltourismsettlement) + (-2 * hightechhub) + (5 * asteroidbase) + (3 * piratebase) + (2 * criminaloutpost)
+    systemscores["standard of living"] = (6 * government) + (5 * orbis) + (5 * medical) + (5 * commercialoutpost) + (5 * spacefarm) + (3 * coriolis) + (3 * securitystation) + (3 * bar) + (civilianoutpost) + (satellite) + (-2 * miningoutpost) + (10 * largeagriculturalsettlement) + (6 * planetaryport) + (6 * mediumagriculturalsettlement) + (3 * civilianplanetaryoutpost) + (3 * outposthub) + (3 * civilianhub) + (3 * smallagriculturalsettlement) + (-2 * refineryhub) + (-2 * largeextractionsettlement) + (-4 * industrialhub) + (-4 * extractionhub) + (-4 * asteroidbase)
+    systemscores["development level"] = (8 * orbis) + (2 * government) + (2 * coriolis) + (2 * securitystation) + (2 * researchstation) + (2 * industrialoutpost) + (2 * tourist) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (10 * planetaryport) + (8 * largeindustrialsettlement) + (7 * refineryhub) + (5 * mediumindustrialsettlement) + (2 * outposthub) + (2 * civilianhub) + (2 * industrialhub) + (2 * extractionhub) + (2 * largescientificsettlement) + (2 * explorationhub) + (2 * largemilitarysettlement) + (2 * smallindustrialsettlement) + (mediumscientificsettlement) + (scientificplanetaryoutpost) + (smallscientificsettlement) + (7 * asteroidbase)
+    # values from Colonization Construction Details (By DaftMav) -- https://docs.google.com/spreadsheets/d/16_hh1G6Tb66OdS01Li0955lITp7yLleb3a8dmqVqq2o/edit?usp=sharing
+    systemscores["construction cost"] = 53723 * (coriolis + asteroidbase) + 209122 * orbis + 18988*(commercialoutpost + industrialoutpost + civilianoutpost + scientificoutpost + militaryoutpost + criminaloutpost) + 6721*(satellite + communicationstation + spacefarm + piratebase + miningoutpost + relaystation) + 10080*(military + securitystation + government + medical + researchstation + tourist + bar) + 36829*(civilianplanetaryoutpost + industrialplanetaryoutpost + scientificplanetaryoutpost) + 215882*planetaryport + 2840*(smallagriculturalsettlement + smallextractionsettlement + smallindustrialsettlement + smallmilitarysettlement + smallscientificsettlement + smalltourismsettlement) + 5690*(mediumagriculturalsettlement + mediumextractionsettlement + mediumindustrialsettlement + mediummilitarysettlement + mediumscientificsettlement + mediumtourismsettlement) + 8530*(largeagriculturalsettlement + largeextractionsettlement + largeindustrialsettlement + largemilitarysettlement + largescientificsettlement + largetourismsettlement) + 9800*(civilianhub + explorationhub + outposthub + explorationhub + scientifichub + militaryhub + refineryhub + hightechhub + industrialhub) - initial_construction_cost
+
     #objective function
-    if maximize == "initial population increase":
-        prob += (5 * orbis) + (coriolis) + (scientificoutpost) + (militaryoutpost) + (10 * planetaryport) + (2 * civilianplanetaryoutpost) + (industrialplanetaryoutpost) + (scientificplanetaryoutpost) + (asteroidbase), "initial population increase"
-    elif maximize == "maximum population increase":
-        prob += (orbis) + (10 * planetaryport) >= minmaxpopulationincrease, "maximum population increase"
-    elif maximize == "security":
-        prob += (8 * securitystation) + (6 * military) + (2 * militaryoutpost) + (2 * government) + (communicationstation) + (relaystation) + (-1 * commercialoutpost) + (-1 * civilianoutpost) + (-2 * coriolis) + (-2 * bar) + (-3 * orbis) + (-3 * tourist) + (10 * militaryhub) + (6 * largemilitarysettlement) + (4 * mediummilitarysettlement) + (2 * smallmilitarysettlement) + (-1 * industrialplanetaryoutpost) + (-1 * scientificplanetaryoutpost) + (-1 * smalltourismsettlement) + (-1 * mediumtourismsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * explorationhub) + (-2 * civilianplanetaryoutpost) + (-2 * hightechhub) + (-2 * outposthub) + (-3 * planetaryport) + (-3 * civilianhub) + (-1 * asteroidbase) + (-4 * piratebase) + (-2 * criminaloutpost), "security"
-    elif maximize == "tech level":
-        prob += (8 * researchstation) + (6 * orbis) + (3 * communicationstation) + (3 * scientificoutpost) + (3 * industrialoutpost) + (3 * medical) + (coriolis) + (10 * hightechhub) + (10 * largescientificsettlement) + (10 * scientifichub) + (6 * explorationhub) + (6 * mediumscientificsettlement) + (5 * scientificplanetaryoutpost) + (5 * planetaryport) + (3 * refineryhub) + (3 * smallscientificsettlement) + (3 * industrialhub) + (largeextractionsettlement) + (3 * asteroidbase), "tech level"
-    elif maximize == "wealth":
-        prob += (7 * orbis) + (6 * tourist) + (3 * miningoutpost) + (2 * coriolis) + (2 * commercialoutpost) + (2 * bar) + (civilianoutpost) + (satellite) + (10 * extractionhub) + (7 * largeextractionsettlement) + (5 * planetaryport) + (5 * mediumextractionsettlement) + (5 * largetourismsettlement) + (5 * refineryhub) + (5 * industrialhub) + (2 * industrialplanetaryoutpost) + (2 * smallextractionsettlement) + (2 * largeindustrialsettlement) + (2 * mediumtourismsettlement) + (smalltourismsettlement) + (-2 * hightechhub) + (5 * asteroidbase) + (3 * piratebase) + (2 * criminaloutpost), "wealth"
-    elif maximize == "standard of living":
-        prob += (6 * government) + (5 * orbis) + (5 * medical) + (5 * commercialoutpost) + (5 * spacefarm) + (3 * coriolis) + (3 * securitystation) + (3 * bar) + (civilianoutpost) + (satellite) + (-2 * miningoutpost) + (10 * largeagriculturalsettlement) + (6 * planetaryport) + (6 * mediumagriculturalsettlement) + (3 * civilianplanetaryoutpost) + (3 * outposthub) + (3 * civilianhub) + (3 * smallagriculturalsettlement) + (-2 * refineryhub) + (-2 * largeextractionsettlement) + (-4 * industrialhub) + (-4 * extractionhub) + (-4 * asteroidbase), "standard of living"
-    elif maximize == "development level":
-        prob += (8 * orbis) + (2 * government) + (2 * coriolis) + (2 * securitystation) + (2 * researchstation) + (2 * industrialoutpost) + (2 * tourist) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (10 * planetaryport) + (8 * largeindustrialsettlement) + (7 * refineryhub) + (5 * mediumindustrialsettlement) + (2 * outposthub) + (2 * civilianhub) + (2 * industrialhub) + (2 * extractionhub) + (2 * largescientificsettlement) + (2 * explorationhub) + (2 * largemilitarysettlement) + (2 * smallindustrialsettlement) + (mediumscientificsettlement) + (scientificplanetaryoutpost) + (smallscientificsettlement) + (7 * asteroidbase), "development level"
+    if maximize in systemscores:
+        prob += systemscores[maximize]
     else:
-        resultlabel.config(text="Error: One or more inputs are blank")
+        resultlabel.config(text=f"Error: One or more inputs are blank: unknown objective '{maximize}'")
         return None
-    #minimum stats
-    prob += (5 * orbis) + (coriolis) + (scientificoutpost) + (militaryoutpost) + (10 * planetaryport) + (2 * civilianplanetaryoutpost) + (industrialplanetaryoutpost) + (scientificplanetaryoutpost) + (asteroidbase) >= mininitialpopulationincrease, "minimum initial population increase"
-    prob += (orbis) + (10 * planetaryport) >= minmaxpopulationincrease, "minimum maximum population increase"
-    prob += (8 * securitystation) + (6 * military) + (2 * militaryoutpost) + (2 * government) + (communicationstation) + (relaystation) + (-1 * commercialoutpost) + (-1 * civilianoutpost) + (-2 * coriolis) + (-2 * bar) + (-3 * orbis) + (-3 * tourist) + (10 * militaryhub) + (6 * largemilitarysettlement) + (4 * mediummilitarysettlement) + (2 * smallmilitarysettlement) + (-1 * industrialplanetaryoutpost) + (-1 * scientificplanetaryoutpost) + (-1 * smalltourismsettlement) + (-1 * mediumtourismsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * explorationhub) + (-2 * civilianplanetaryoutpost) + (-2 * hightechhub) + (-2 * outposthub) + (-3 * planetaryport) + (-3 * civilianhub) + (-1 * asteroidbase) + (-4 * piratebase) + (-2 * criminaloutpost) >= minsecurity, "minimum security"
-    prob += (8 * researchstation) + (6 * orbis) + (3 * communicationstation) + (3 * scientificoutpost) + (3 * industrialoutpost) + (3 * medical) + (coriolis) + (10 * hightechhub) + (10 * largescientificsettlement) + (10 * scientifichub) + (6 * explorationhub) + (6 * mediumscientificsettlement) + (5 * scientificplanetaryoutpost) + (5 * planetaryport) + (3 * refineryhub) + (3 * smallscientificsettlement) + (3 * industrialhub) + (largeextractionsettlement) + (3 * asteroidbase) >= mintechlevel, "minimum tech level"
-    prob += (7 * orbis) + (6 * tourist) + (3 * miningoutpost) + (2 * coriolis) + (2 * commercialoutpost) + (2 * bar) + (civilianoutpost) + (satellite) + (10 * extractionhub) + (7 * largeextractionsettlement) + (5 * planetaryport) + (5 * mediumextractionsettlement) + (5 * largetourismsettlement) + (5 * refineryhub) + (5 * industrialhub) + (2 * industrialplanetaryoutpost) + (2 * smallextractionsettlement) + (2 * largeindustrialsettlement) + (2 * mediumtourismsettlement) + (smalltourismsettlement) + (-2 * hightechhub) + (5 * asteroidbase) + (3 * piratebase) + (2 * criminaloutpost) >= minwealth, "minimum wealth"
-    prob += (6 * government) + (5 * orbis) + (5 * medical) + (5 * commercialoutpost) + (5 * spacefarm) + (3 * coriolis) + (3 * securitystation) + (3 * bar) + (civilianoutpost) + (satellite) + (-2 * miningoutpost) + (10 * largeagriculturalsettlement) + (6 * planetaryport) + (6 * mediumagriculturalsettlement) + (3 * civilianplanetaryoutpost) + (3 * outposthub) + (3 * civilianhub) + (3 * smallagriculturalsettlement) + (-2 * refineryhub) + (-2 * largeextractionsettlement) + (-4 * industrialhub) + (-4 * extractionhub) + (-4 * asteroidbase) >= minstandardofliving, "minimum standard of living"
-    prob += (8 * orbis) + (2 * government) + (2 * coriolis) + (2 * securitystation) + (2 * researchstation) + (2 * industrialoutpost) + (2 * tourist) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (10 * planetaryport) + (8 * largeindustrialsettlement) + (7 * refineryhub) + (5 * mediumindustrialsettlement) + (2 * outposthub) + (2 * civilianhub) + (2 * industrialhub) + (2 * extractionhub) + (2 * largescientificsettlement) + (2 * explorationhub) + (2 * largemilitarysettlement) + (2 * smallindustrialsettlement) + (mediumscientificsettlement) + (scientificplanetaryoutpost) + (smallscientificsettlement) + (7 * asteroidbase) >= mindevelopmentlevel, "minimum development level"
+
+    #minimum and maximum stats
+    for score in listofscores:
+        minvalue = convert_maybe(minvars[score].get())
+        maxvalue = convert_maybe(maxvars[score].get(), default=None)
+        if minvalue is not None:
+            prob += systemscores[score] >= minvalue, "minimum " + score
+        if maxvalue is not None:
+            prob += systemscores[score] <= maxvalue, "maximum " + score
+
     #number of slots
-    prob += coriolis + orbis + commercialoutpost + industrialoutpost + civilianoutpost + scientificoutpost + militaryoutpost + satellite + communicationstation + spacefarm + miningoutpost + relaystation + military + securitystation + government + medical + researchstation + tourist + bar + asteroidbase + criminaloutpost + piratebase == orbitalfacilityslots + 1, "orbital facility slots"
-    prob += civilianplanetaryoutpost + industrialplanetaryoutpost + scientificplanetaryoutpost + planetaryport + smallagriculturalsettlement + mediumagriculturalsettlement + largeagriculturalsettlement + smallextractionsettlement + mediumextractionsettlement + largeextractionsettlement + smallindustrialsettlement + mediumindustrialsettlement + largeindustrialsettlement + smallmilitarysettlement + mediummilitarysettlement + largemilitarysettlement + smallscientificsettlement + mediumscientificsettlement + largescientificsettlement + smalltourismsettlement + mediumtourismsettlement + largetourismsettlement + extractionhub + civilianhub + explorationhub + outposthub + scientifichub + militaryhub + refineryhub + hightechhub + industrialhub == groundfacilityslots, "ground facility slots"
+    prob += coriolis + orbis + commercialoutpost + industrialoutpost + civilianoutpost + scientificoutpost + militaryoutpost + satellite + communicationstation + spacefarm + miningoutpost + relaystation + military + securitystation + government + medical + researchstation + tourist + bar + asteroidbase + criminaloutpost + piratebase <= orbitalfacilityslots + 1, "orbital facility slots"
+    prob += civilianplanetaryoutpost + industrialplanetaryoutpost + scientificplanetaryoutpost + planetaryport + smallagriculturalsettlement + mediumagriculturalsettlement + largeagriculturalsettlement + smallextractionsettlement + mediumextractionsettlement + largeextractionsettlement + smallindustrialsettlement + mediumindustrialsettlement + largeindustrialsettlement + smallmilitarysettlement + mediummilitarysettlement + largemilitarysettlement + smallscientificsettlement + mediumscientificsettlement + largescientificsettlement + smalltourismsettlement + mediumtourismsettlement + largetourismsettlement + extractionhub + civilianhub + explorationhub + outposthub + scientifichub + militaryhub + refineryhub + hightechhub + industrialhub <= groundfacilityslots, "ground facility slots"
+
     #construction points
-    prob += (industrialoutpost) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (commercialoutpost) + (miningoutpost) + (communicationstation) + (scientificoutpost) + (militaryoutpost) + (mediumindustrialsettlement) + (smallindustrialsettlement) + (scientificplanetaryoutpost) + (mediumagriculturalsettlement) + (civilianplanetaryoutpost) + (smallagriculturalsettlement) + (mediummilitarysettlement) + (smallmilitarysettlement) + (industrialplanetaryoutpost) + (mediumextractionsettlement) + (smallextractionsettlement) + (-3 * coriolis) + (-1 * government) + (-1 * securitystation) + (-1 * researchstation) + (-1 * tourist) + (-1 * medical) + (-1 * bar) + (-1 * military) + (-1 * largeindustrialsettlement) + (-1 * largescientificsettlement) + (-1 * largemilitarysettlement) + (-1 * largeagriculturalsettlement) + (-1 * largeextractionsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * outposthub) + (-1 * civilianhub) + (-1 * industrialhub) + (-1 * extractionhub) + (-1 * explorationhub) + (-1 * mediumscientificsettlement) + (-1 * smallscientificsettlement) + (-1 * hightechhub) + (-1 * scientifichub) + (-1 * militaryhub) + (-1 * mediumtourismsettlement) + (-1 * smalltourismsettlement) + inittier2conpoints + piratebase + criminaloutpost + (-3 * asteroidbase) >= 0, "tier 2 construction points"
-    prob += (coriolis) + (government) + (securitystation) + (researchstation) + (tourist) + (medical) + (bar) + (military) + (2 * largeindustrialsettlement) + (2 * largescientificsettlement) + (2 * largemilitarysettlement) + (2 * largeagriculturalsettlement) + (2 * largeextractionsettlement) + (2 * largetourismsettlement) + (refineryhub) + (outposthub) + (civilianhub) + (industrialhub) + (extractionhub) + (explorationhub) + (mediumscientificsettlement) + (smallscientificsettlement) + (hightechhub) + (scientifichub) + (militaryhub) + (mediumtourismsettlement) + (smalltourismsettlement) + (-6 * orbis) + (-6 * planetaryport) + inittier3conpoints + asteroidbase >= 0, "tier 3 construction points"
+    portsT2constructionpoints = pulp.lpSum( (coriolis_vars[k] + asteroidbase_vars[k]) * max(3, 2*k+1) for k in range(max_nb_ports))
+    portsT3constructionpoints = pulp.lpSum( (orbis_vars[k] + planetaryport_vars[k]) * max(6, 6*k) for k in range(max_nb_ports))
+    prob += (industrialoutpost) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (commercialoutpost) + (miningoutpost) + (communicationstation) + (scientificoutpost) + (militaryoutpost) + (mediumindustrialsettlement) + (smallindustrialsettlement) + (scientificplanetaryoutpost) + (mediumagriculturalsettlement) + (civilianplanetaryoutpost) + (smallagriculturalsettlement) + (mediummilitarysettlement) + (smallmilitarysettlement) + (industrialplanetaryoutpost) + (mediumextractionsettlement) + (smallextractionsettlement) + (-1 * government) + (-1 * securitystation) + (-1 * researchstation) + (-1 * tourist) + (-1 * medical) + (-1 * bar) + (-1 * military) + (-1 * largeindustrialsettlement) + (-1 * largescientificsettlement) + (-1 * largemilitarysettlement) + (-1 * largeagriculturalsettlement) + (-1 * largeextractionsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * outposthub) + (-1 * civilianhub) + (-1 * industrialhub) + (-1 * extractionhub) + (-1 * explorationhub) + (-1 * mediumscientificsettlement) + (-1 * smallscientificsettlement) + (-1 * hightechhub) + (-1 * scientifichub) + (-1 * militaryhub) + (-1 * mediumtourismsettlement) + (-1 * smalltourismsettlement) + piratebase + criminaloutpost - portsT2constructionpoints >= 0, "tier 2 construction points"
+    prob += (coriolis) + (government) + (securitystation) + (researchstation) + (tourist) + (medical) + (bar) + (military) + (2 * largeindustrialsettlement) + (2 * largescientificsettlement) + (2 * largemilitarysettlement) + (2 * largeagriculturalsettlement) + (2 * largeextractionsettlement) + (2 * largetourismsettlement) + (refineryhub) + (outposthub) + (civilianhub) + (industrialhub) + (extractionhub) + (explorationhub) + (mediumscientificsettlement) + (smallscientificsettlement) + (hightechhub) + (scientifichub) + (militaryhub) + (mediumtourismsettlement) + (smalltourismsettlement) + asteroidbase - portsT3constructionpoints >= 0, "tier 3 construction points"
+
     #sort out dependencies for facilities
     b1 = pulp.LpVariable("b1", cat="Binary")
     b2 = pulp.LpVariable("b2", cat="Binary")
@@ -262,33 +290,47 @@ def solve():
         resultlabel.config(text="Error: There is no possible system arrangement that can fit the conditions you have specified")
         return None
     printresult("Here is what you need to build in the system (including the first station) to achieve these requirements: ")
+    if minorbis > 0:
+        printresult(f"Orbis or Ocellus 0 = {minorbis}")
+    if mincoriolis > 0:
+        printresult(f"Coriolis 0 = {mincoriolis}")
+    if minasteroidbase > 0:
+        printresult(f"Asteroid Base 0 = {minasteroidbase}")
     for v in prob.variables():
         if v.name != "__dummy":
-            if v.varValue > 0 and not bool(re.fullmatch(r"b\d+", v.name)) and not bool(re.fullmatch(r"any_positive\d+", v.name)):
-                if v.name == "orbis":
-                    printresult("orbis/ocellus =" + str(v.varValue))
-                else:
-                    printresult(v.name + "=" + str(v.varValue))
-    printresult("Total initial population increase: " + str(pulp.value((5 * orbis) + (coriolis) + (scientificoutpost) + (militaryoutpost) + (10 * planetaryport) + (2 * civilianplanetaryoutpost) + (industrialplanetaryoutpost) + (scientificplanetaryoutpost) + (asteroidbase))))
-    printresult("Total maximum population increase: " + str(pulp.value((orbis) + (10 * planetaryport))))
-    printresult("Total security: " + str(pulp.value((8 * securitystation) + (6 * military) + (2 * militaryoutpost) + (2 * government) + (communicationstation) + (relaystation) + (-1 * commercialoutpost) + (-1 * civilianoutpost) + (-2 * coriolis) + (-2 * bar) + (-3 * orbis) + (-3 * tourist) + (10 * militaryhub) + (6 * largemilitarysettlement) + (4 * mediummilitarysettlement) + (2 * smallmilitarysettlement) + (-1 * industrialplanetaryoutpost) + (-1 * scientificplanetaryoutpost) + (-1 * smalltourismsettlement) + (-1 * mediumtourismsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * explorationhub) + (-2 * civilianplanetaryoutpost) + (-2 * hightechhub) + (-2 * outposthub) + (-3 * planetaryport) + (-3 * civilianhub) + (-1 * asteroidbase) + (-4 * piratebase) + (-2 * criminaloutpost))))
-    printresult("Total tech level: " + str(pulp.value((8 * researchstation) + (6 * orbis) + (3 * communicationstation) + (3 * scientificoutpost) + (3 * industrialoutpost) + (3 * medical) + (coriolis) + (10 * hightechhub) + (10 * largescientificsettlement) + (10 * scientifichub) + (6 * explorationhub) + (6 * mediumscientificsettlement) + (5 * scientificplanetaryoutpost) + (5 * planetaryport) + (3 * refineryhub) + (3 * smallscientificsettlement) + (3 * industrialhub) + (largeextractionsettlement) + (3 * asteroidbase))))
-    printresult("Total wealth: " + str(pulp.value((7 * orbis) + (6 * tourist) + (3 * miningoutpost) + (2 * coriolis) + (2 * commercialoutpost) + (2 * bar) + (civilianoutpost) + (satellite) + (10 * extractionhub) + (7 * largeextractionsettlement) + (5 * planetaryport) + (5 * mediumextractionsettlement) + (5 * largetourismsettlement) + (5 * refineryhub) + (5 * industrialhub) + (2 * industrialplanetaryoutpost) + (2 * smallextractionsettlement) + (2 * largeindustrialsettlement) + (2 * mediumtourismsettlement) + (smalltourismsettlement) + (-2 * hightechhub) + (5 * asteroidbase) + (3 * piratebase) + (2 * criminaloutpost))))
-    printresult("Total standard of living: " + str(pulp.value((6 * government) + (5 * orbis) + (5 * medical) + (5 * commercialoutpost) + (5 * spacefarm) + (3 * coriolis) + (3 * securitystation) + (3 * bar) + (civilianoutpost) + (satellite) + (-2 * miningoutpost) + (10 * largeagriculturalsettlement) + (6 * planetaryport) + (6 * mediumagriculturalsettlement) + (3 * civilianplanetaryoutpost) + (3 * outposthub) + (3 * civilianhub) + (3 * smallagriculturalsettlement) + (-2 * refineryhub) + (-2 * largeextractionsettlement) + (-4 * industrialhub) + (-4 * extractionhub) + (-4 * asteroidbase))))
-    printresult("Total development level: " + str(pulp.value((8 * orbis) + (2 * government) + (2 * coriolis) + (2 * securitystation) + (2 * researchstation) + (2 * industrialoutpost) + (2 * tourist) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (10 * planetaryport) + (8 * largeindustrialsettlement) + (7 * refineryhub) + (5 * mediumindustrialsettlement) + (2 * outposthub) + (2 * civilianhub) + (2 * industrialhub) + (2 * extractionhub) + (2 * largescientificsettlement) + (2 * explorationhub) + (2 * largemilitarysettlement) + (2 * smallindustrialsettlement) + (mediumscientificsettlement) + (scientificplanetaryoutpost) + (smallscientificsettlement) + (7 * asteroidbase))))
+            if not bool(re.fullmatch(r"b\d+", v.name)) and not bool(re.fullmatch(r"any_positive\d+", v.name)) and v.name != "after_increase":
+                value = int(v.varValue)
+                name = v.name.replace("_", " ")
+                if value > 0:
+                    printresult(f"{name} = {value}")
+
+    for score in listofscores:
+        resultvars[score].set(int(pulp.value(systemscores[score])))
+
 def printresult(text):
     current_text = resultlabel.cget("text")
     new_text = current_text + "\n" + text
     resultlabel.config(text=new_text)
 # tkinter setup
 def validate_input(P):
-    return P.isdigit() or P == ""
+    return P.isdigit() or P == "" or P == "-" or (P[0] == "-" and P[1:].isdigit())
+
 def on_focus_out(event, var):
-    value = event.widget.get()
-    if value == "":
-        var.set(0)
-    else:
-        var.set(int(value))
+    value = event.widget.get().lower()
+    var.set(value)
+
+def set_color_if_negative(variable, entry, color="red"):
+    original_color = entry.cget("fg")
+    def callback(var, index, mode):
+        val = variable.get()
+        if val < 0:
+            entry.config(fg=color)
+        else:
+            entry.config(fg=original_color)
+    variable.trace_add("write", callback)
+
+listofscores = ["initial population increase", "max population increase", "security", "tech level", "wealth", "standard of living", "development level", "construction cost"]
+
 root = tkinter.Tk()
 vcmd = root.register(validate_input)
 root.title("Elite Dangerous colonisation planner")
@@ -296,25 +338,41 @@ root.geometry("800x1000")
 maximizeinput = tkinter.StringVar()
 frame = tkinter.Frame(root)
 frame.pack(pady=5)
-label = tkinter.Label(frame, text="Select what you are trying to maximise:", font=("calibri", 12))
+label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("calibri", 12))
 label.pack(side="left")
-dropdown = tkinter.OptionMenu(frame, maximizeinput, "initial population increase", "maximum population increase", "security", "tech level", "wealth", "standard of living", "development level")
+dropdown = tkinter.OptionMenu(frame, maximizeinput, *listofscores)
 dropdown.pack(side="left")
-listofminimum = ["initial population increase", "max population increase", "security", "tech level", "wealth", "standard of living", "development level"]
-counter = 2
+
 minframes = {}
 minvars = {}
-for i in listofminimum:
-    minframes[counter] = tkinter.Frame(root)
-    minframes[counter].pack(pady=5)
-    var_name = "min" + i.replace(" ", "") + "input"
-    minvars[var_name] = tkinter.IntVar()
-    label = tkinter.Label(minframes[counter], text="Enter the minimum " + i + " you want for your system:",font=("calibri", 12))
-    label.pack(side="left")
-    entry = tkinter.Entry(minframes[counter], textvariable=minvars[var_name], validate="key", validatecommand=(vcmd, "%P"),width=10)
-    entry.pack(side="left")
-    entry.bind("<FocusOut>", lambda event, var=minvars[var_name]: on_focus_out(event, var))
-    counter += 1
+maxvars = {}
+resultvars = {}
+
+constraint_frame = tkinter.Frame(root)
+constraint_frame.pack(padx=10, pady=5)
+tkinter.Label(constraint_frame, text="System Scores",font=("calibri", 12)).grid(column=0, columnspan=3, row=0)
+tkinter.Label(constraint_frame, text="min. value",font=("calibri", 12)).grid(column=1, row=1)
+tkinter.Label(constraint_frame, text="max. value",font=("calibri", 12)).grid(column=2, row=1)
+tkinter.Label(constraint_frame, text="solution value",font=("calibri", 12)).grid(column=3, row=1)
+for i, name in enumerate(listofscores):
+    minvars[name] = tkinter.StringVar(value="")
+    maxvars[name] = tkinter.StringVar(value="")
+    resultvars[name] = tkinter.IntVar()
+
+    label = tkinter.Label(constraint_frame, text=name,font=("calibri", 12))
+    label.grid(column=0, row=2+i)
+    entry_min = tkinter.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
+    entry_max = tkinter.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
+    entry_min.grid(column=1, row=2+i)
+    entry_max.grid(column=2, row=2+i)
+    entry_min.bind("<FocusOut>", lambda event, var=minvars[name]: on_focus_out(event, var))
+    entry_max.bind("<FocusOut>", lambda event, var=maxvars[name]: on_focus_out(event, var))
+
+    result = tkinter.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=tkinter.RIGHT)
+    result.grid(column=3, row=2+i, padx=5)
+    result.config(state="readonly")
+    set_color_if_negative(resultvars[name], result)
+
 orbitalfacilityslotsinput = tkinter.IntVar()
 groundfacilityslotsinput = tkinter.IntVar()
 asteroidslotsinput = tkinter.IntVar()
@@ -347,7 +405,7 @@ frame23 = tkinter.Frame(root)
 frame23.pack(pady=5)
 label = tkinter.Label(frame23, text="Select your first station:", font=("calibri", 12))
 label.pack(side="left")
-dropdown = tkinter.OptionMenu(frame23, firststationinput, "orbis", "ocellus", "asteroid base", "coriolis", "commerical outpost", "industrial outpost", "criminal outpost", "civilian outpost", "scientific outpost", "military outpost")
+dropdown = tkinter.OptionMenu(frame23, firststationinput, "orbis", "ocellus", "asteroid base", "coriolis", "commercial outpost", "industrial outpost", "criminal outpost", "civilian outpost", "scientific outpost", "military outpost")
 dropdown.pack(side="left")
 button = tkinter.Button(root, text="Solve for a system", command=lambda: solve())
 button.pack(pady=7)
