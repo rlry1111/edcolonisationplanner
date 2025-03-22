@@ -4,7 +4,8 @@ import tkinter
 import os
 import sys
 #I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
-pulp.LpSolverDefault.path = os.path.join(sys._MEIPASS, 'cbc.exe')
+cbc_path = os.path.join(sys._MEIPASS, "cbc.exe")
+solver = pulp.COIN_CMD(path=cbc_path)
 def solve():
     #requirements
     resultlabel.config(text="")
@@ -289,7 +290,7 @@ def solve():
     prob += communicationstation >= b21
     prob += explorationhub <= M * b21
     #solve
-    prob.solve()
+    prob.solve(solver)
     if pulp.LpStatus[prob.status] == "Infeasible":
         resultlabel.config(text="Error: There is no possible system arrangement that can fit the conditions you have specified")
         return None
