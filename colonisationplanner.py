@@ -1,6 +1,10 @@
 import pulp
 import re
 import tkinter
+import os
+import sys
+#I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
+pulp.LpSolverDefault.path = os.path.join(sys._MEIPASS, 'cbc.exe')
 def solve():
     #requirements
     resultlabel.config(text="")
