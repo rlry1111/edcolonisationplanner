@@ -3,9 +3,14 @@ import re
 import tkinter
 import os
 import sys
-#I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
-cbc_path = os.path.join(sys._MEIPASS, "cbc.exe")
-solver = pulp.COIN_CMD(path=cbc_path)
+
+if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
+    #I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
+    cbc_path = os.path.join(sys._MEIPASS, "cbc.exe")
+    solver = pulp.COIN_CMD(path=cbc_path)
+else:
+    solver = None
+
 def solve():
     #requirements
     resultlabel.config(text="")
