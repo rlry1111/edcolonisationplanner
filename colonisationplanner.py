@@ -3,7 +3,10 @@ import re
 import tkinter
 import os
 import sys
-
+#TODO
+#   Allow for selecting no maximum/minimum
+#   Add port economy (once Fdev fixes it)
+#   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
 if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
     #I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
     cbc_path = os.path.join(sys._MEIPASS, "cbc.exe")
