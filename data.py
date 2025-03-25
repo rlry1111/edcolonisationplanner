@@ -87,9 +87,11 @@ add_building("Medium_Tourism_Settlement", "ground", security=-1, wealth=2, const
 add_building("Large_Tourism_Settlement",  "ground", security=-1, wealth=5, construction_cost=8530, T2points=-1, T3points=2, dependencies=["Satellite"])
 
 # Categories
+make_category("All", *all_buildings.keys())
 make_category("First Station", "Orbis_or_Ocellus", "Coriolis", "Asteroid_Base", "Commercial_Outpost", "Industrial_Outpost", "Criminal_Outpost", "Civilian_Outpost", "Scientific_Outpost", "Military_Outpost")
 make_category("Space", *(n for n, b in all_buildings.items() if b.slot == "space"))
 make_category("Ground", *(n for n, b in all_buildings.items() if b.slot == "ground"))
+make_category("T1", *(n for n, b in all_buildings.items() if b.T2points != "port" and b.T2points > 0))
 make_category("T2", *(n for n, b in all_buildings.items() if b.T2points == "port" or b.T2points < 0))
 make_category("T3", *(n for n, b in all_buildings.items() if b.T3points == "port" or b.T3points < 0))
 make_category("Star/Ground Port", "Orbis_or_Ocellus", "Coriolis", "Asteroid_Base", "Civilian_Planetary_Outpost", "Industrial_Planetary_Outpost", "Scientific_Planetary_Outpost", "Planetary_Port")
@@ -99,6 +101,9 @@ make_category("Small Settlement", *(n for n in all_buildings.keys() if n.endswit
 make_category("Medium Settlement", *(n for n in all_buildings.keys() if n.endswith("Settlement") and n.startswith("Medium")))
 make_category("Large Settlement", *(n for n in all_buildings.keys() if n.endswith("Settlement") and n.startswith("Large")))
 
+
+def is_port(building):
+    return building.T2points == "port" or building.T3points == "port"
 
 def to_printable(name):
     return name.replace("_", " ")
