@@ -84,7 +84,7 @@ def solve():
     # orbital and planetary ports, subject to cost increase
     # Speculation for how construction points increase based on
     # https://old.reddit.com/r/EliteDangerous/comments/1jfm0y6/psa_construction_points_costs_triple_after_third/
-    max_nb_ports = 20 # not sure how to find the correct value for this
+    max_nb_ports = orbitalfacilityslots + groundfacilityslots # may be a bit inefficient but should work
     coriolis_vars      = [ pulp.LpVariable(f"Coriolis_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
     orbis_vars         = [ pulp.LpVariable(f"Orbis_or_Ocellus_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
     asteroidbase_vars  = [ pulp.LpVariable(f"Asteroid_Base_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
@@ -300,6 +300,9 @@ def solve():
         resultlabel.config(text="Error: There is no possible system arrangement that can fit the conditions you have specified")
         return None
     printresult("Here is what you need to build in the system (including the first station) to achieve these requirements: ")
+    if pulp.value(coriolis + orbis + planetaryport + asteroidbase) > 0:
+        printresult("Note: build ports (e.g. orbis, ocellus, asteroid base, coriolis, planetary port) in order.")
+        printresult("e.g. build planetary port 1 before coriolis 2, build coriolis 2 before asteroid base 3, etc.")
     if minorbis > 0:
         printresult(f"Orbis or Ocellus 0 = {minorbis}")
     if mincoriolis > 0:
@@ -419,6 +422,6 @@ dropdown = tkinter.OptionMenu(frame23, firststationinput, "orbis", "ocellus", "a
 dropdown.pack(side="left")
 button = tkinter.Button(root, text="Solve for a system", command=lambda: solve())
 button.pack(pady=7)
-resultlabel = tkinter.Label(root, text="", font=("calibri", 12))
-resultlabel.pack(pady=10)
+resultlabel = tkinter.Label(root, text="", font=("calibri", 10))
+resultlabel.pack(pady=5)
 root.mainloop()
