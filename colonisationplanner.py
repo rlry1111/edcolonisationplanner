@@ -95,7 +95,7 @@ def solve():
     # orbital and planetary ports, subject to cost increase
     # Speculation for how construction points increase based on
     # https://old.reddit.com/r/EliteDangerous/comments/1jfm0y6/psa_construction_points_costs_triple_after_third/
-    max_nb_ports = orbitalfacilityslots + groundfacilityslots # may be a bit inefficient but should work
+    max_nb_ports = max(1, orbitalfacilityslots + groundfacilityslots) # may be a bit inefficient but should work
     coriolis_vars      = [ pulp.LpVariable(f"Coriolis_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
     orbis_vars         = [ pulp.LpVariable(f"Orbis_or_Ocellus_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
     asteroidbase_vars  = [ pulp.LpVariable(f"Asteroid_Base_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
@@ -329,8 +329,7 @@ def solve():
                     printresult(f"{name} = {value}")
 
     for score in listofscores:
-        #stop-gap fix, should probably investigate cause later
-        resultvars[score].set(int((lambda x: (pulp.value((orbis) + (10 * planetaryport))) if x is None else x)(pulp.value(systemscores[score]))))
+        resultvars[score].set(int(pulp.value(systemscores[score])))
 
 def printresult(text):
     current_text = resultlabel.cget("text")
