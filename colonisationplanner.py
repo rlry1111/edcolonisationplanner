@@ -1,18 +1,26 @@
 import pulp
 import re
 import tkinter
+import ttkbootstrap
 import os
 import sys
+import pyglet
+
 #TODO
-#   Allow for selecting no maximum/minimum
+#   Let the code select a starting system
 #   Add port economy (once Fdev fixes it)
 #   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
+
+pyglet.options['win32_gdi_font'] = True
 if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
     #I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
     cbc_path = os.path.join(sys._MEIPASS, "cbc.exe")
     solver = pulp.COIN_CMD(path=cbc_path)
+    font_path = os.path.join(sys._MEIPASS, "eurostile.TTF")
+    pyglet.font.add_file(font_path)
 else:
     solver = None
+    pyglet.font.add_file('eurostile.TTF')
 
 def solve():
     #requirements
@@ -321,7 +329,8 @@ def solve():
                     printresult(f"{name} = {value}")
 
     for score in listofscores:
-        resultvars[score].set(int(pulp.value(systemscores[score])))
+        #stop-gap fix, should probably investigate cause later
+        resultvars[score].set(int((lambda x: (pulp.value((orbis) + (10 * planetaryport))) if x is None else x)(pulp.value(systemscores[score]))))
 
 def printresult(text):
     current_text = resultlabel.cget("text")
@@ -335,29 +344,29 @@ def on_focus_out(event, var):
     value = event.widget.get().lower()
     var.set(value)
 
-def set_color_if_negative(variable, entry, color="red"):
-    original_color = entry.cget("fg")
+def set_color_if_negative(variable, entry, color="red", color2="green"):
     def callback(var, index, mode):
         val = variable.get()
         if val < 0:
             entry.config(fg=color)
         else:
-            entry.config(fg=original_color)
+            entry.config(fg=color2)
     variable.trace_add("write", callback)
 
 listofscores = ["initial population increase", "max population increase", "security", "tech level", "wealth", "standard of living", "development level", "construction cost"]
 
-root = tkinter.Tk()
+root = ttkbootstrap.Window(themename="darkly")
 vcmd = root.register(validate_input)
 root.title("Elite Dangerous colonisation planner")
-root.geometry("800x1000")
+root.geometry("1000x1000")
 maximizeinput = tkinter.StringVar()
 frame = tkinter.Frame(root)
 frame.pack(pady=5)
-label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("calibri", 12))
+label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("Eurostile", 12))
 label.pack(side="left")
 dropdown = tkinter.OptionMenu(frame, maximizeinput, *listofscores)
 dropdown.pack(side="left")
+dropdown.config(font=("Eurostile", 10))
 
 minframes = {}
 minvars = {}
@@ -366,16 +375,16 @@ resultvars = {}
 
 constraint_frame = tkinter.Frame(root)
 constraint_frame.pack(padx=10, pady=5)
-tkinter.Label(constraint_frame, text="System Scores",font=("calibri", 12)).grid(column=0, columnspan=3, row=0)
-tkinter.Label(constraint_frame, text="min. value",font=("calibri", 12)).grid(column=1, row=1)
-tkinter.Label(constraint_frame, text="max. value",font=("calibri", 12)).grid(column=2, row=1)
-tkinter.Label(constraint_frame, text="solution value",font=("calibri", 12)).grid(column=3, row=1)
+tkinter.Label(constraint_frame, text="System Scores",font=("Eurostile", 12)).grid(column=0, columnspan=3, row=0)
+tkinter.Label(constraint_frame, text="min. value",font=("Eurostile", 12)).grid(column=1, row=1)
+tkinter.Label(constraint_frame, text="max. value",font=("Eurostile", 12)).grid(column=2, row=1)
+tkinter.Label(constraint_frame, text="solution value",font=("Eurostile", 12)).grid(column=3, row=1)
 for i, name in enumerate(listofscores):
     minvars[name] = tkinter.StringVar(value="")
     maxvars[name] = tkinter.StringVar(value="")
     resultvars[name] = tkinter.IntVar()
 
-    label = tkinter.Label(constraint_frame, text=name,font=("calibri", 12))
+    label = tkinter.Label(constraint_frame, text=name,font=("Eurostile", 12))
     label.grid(column=0, row=2+i)
     entry_min = tkinter.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
     entry_max = tkinter.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
@@ -394,37 +403,38 @@ groundfacilityslotsinput = tkinter.IntVar()
 asteroidslotsinput = tkinter.IntVar()
 frame20 = tkinter.Frame(root)
 frame20.pack(pady=5)
-label = tkinter.Label(frame20, text="Enter the number of orbital facility slots your system has (excluding the first station):", font=("calibri", 12))
+label = tkinter.Label(frame20, text="Enter the number of orbital facility slots your system has (excluding the first station):", font=("Eurostile", 12))
 label.pack(side="left")
 entry = tkinter.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=orbitalfacilityslotsinput: on_focus_out(event, var))
 frame21 = tkinter.Frame(root)
 frame21.pack(pady=5)
-label = tkinter.Label(frame21, text="Enter the number of ground facility slots your system has:", font=("calibri", 12))
+label = tkinter.Label(frame21, text="Enter the number of ground facility slots your system has:", font=("Eurostile", 12))
 label.pack(side="left")
 entry = tkinter.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=groundfacilityslotsinput: on_focus_out(event, var))
 frame22 = tkinter.Frame(root)
 frame22.pack(pady=5)
-label = tkinter.Label(frame22, text="Enter the number of slots your system has that can have asteroid bases (including the first station):", font=("calibri", 12))
+label = tkinter.Label(frame22, text="Enter the number of slots your system has that can have asteroid bases (including the first station):", font=("Eurostile", 12))
 label.pack(side="left")
 entry = tkinter.Entry(frame22, textvariable=asteroidslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=asteroidslotsinput: on_focus_out(event, var))
 criminalinput = tkinter.BooleanVar()
-checkbox = tkinter.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput, font=("calibri", 12))
+checkbox = tkinter.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput, font=("Eurostile", 12))
 checkbox.pack(pady=5)
 firststationinput = tkinter.StringVar()
 frame23 = tkinter.Frame(root)
 frame23.pack(pady=5)
-label = tkinter.Label(frame23, text="Select your first station:", font=("calibri", 12))
+label = tkinter.Label(frame23, text="Select your first station:", font=("Eurostile", 12))
 label.pack(side="left")
 dropdown = tkinter.OptionMenu(frame23, firststationinput, "orbis", "ocellus", "asteroid base", "coriolis", "commercial outpost", "industrial outpost", "criminal outpost", "civilian outpost", "scientific outpost", "military outpost")
 dropdown.pack(side="left")
-button = tkinter.Button(root, text="Solve for a system", command=lambda: solve())
-button.pack(pady=7)
-resultlabel = tkinter.Label(root, text="", font=("calibri", 10))
-resultlabel.pack(pady=5)
+dropdown.config(font=("Eurostile", 10))
+button = tkinter.Button(root, text="Solve for a system", command=lambda: solve(), font=("Eurostile", 10))
+button.pack(pady=5)
+resultlabel = tkinter.Label(root, text="", font=("Eurostile", 10))
+resultlabel.pack(pady=3)
 root.mainloop()
