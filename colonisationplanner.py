@@ -373,9 +373,12 @@ class Building_Row:
         self.at_most_var, self.at_most_entry = make_var_and_entry(building_frame)
         self.to_build_var, self.to_build_entry = make_var_and_entry(building_frame, modifiable=False)
         self.total_var, self.total_entry = make_var_and_entry(building_frame, modifiable=False)
+        self.delete_button = None
+        if result_building:
+            self.create_delete_button()
+
         self.total_var.trace_add("write", lambda v, i, c: self.to_build_var.set(self.total_var.get() - self.already_present_var.get()))
         self.name_var.trace_add("write", self.on_choice)
-        self.index = len(building_input) + 1
 
         if firststation:
             self.already_present_entry.config(state="readonly")
@@ -387,6 +390,7 @@ class Building_Row:
             # self.already_present_entry.config(state="readonly")
 
     def pack(self, index):
+        self.index = index
         self.category_choice.grid(row=index, column=0)
         self.building_choice.grid(row=index, column=1)
         self.already_present_entry.grid(row=index, column=2)
@@ -394,6 +398,8 @@ class Building_Row:
         self.at_most_entry.grid(row=index, column=4)
         self.to_build_entry.grid(row=index, column=5)
         self.total_entry.grid(row=index, column=6)
+        if self.delete_button:
+            self.delete_button.grid(row=index, column=7)
 
     def set_build_result(self, value):
         self.total_var.set(value)
@@ -409,12 +415,15 @@ class Building_Row:
     def on_choice(self, var, index, mode):
         if self.name_var.get() in self.building_choice.cget("values"):
             self.valid = True
-            if self.index == 1:
+            if self.first_station:
                 self.already_present_var.set(1)
             else:
                 self.already_present_entry.focus()
-            if self.index == len(building_input):
+            if self is building_input[-1]:
                 add_empty_building_row()
+                if self.delete_button is None and not self.first_station:
+                    self.create_delete_button()
+                    self.delete_button.grid(row=self.index, column=7)
 
     def delete(self):
         self.category_choice.destroy()
@@ -424,6 +433,19 @@ class Building_Row:
         self.at_most_entry.destroy()
         self.to_build_entry.destroy()
         self.total_entry.destroy()
+        if self.delete_button:
+            self.delete_button.destroy()
+
+    def create_delete_button(self):
+        self.delete_button = tkinter.Button(building_frame, text="X", padx=2, pady=0,
+                                            width=1, command=self.on_delete)
+
+    def on_delete(self):
+        idx = building_input.index(self)
+        self.delete()
+        del building_input[idx]
+        for i, row in enumerate(building_input):
+            row.pack(i+1)
 
     @property
     def is_result(self):
