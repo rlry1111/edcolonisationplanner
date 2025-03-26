@@ -51,7 +51,6 @@ def solve():
             # kth variable is 1 if the k-th port built is of this type
             port_vars[n] = [ pulp.LpVariable(f"{n}_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
             all_vars[n] = pulp.lpSum(port_vars[n])
-
     if not criminalinput.get():
         all_vars["Pirate_Base"].upBound = 0
         all_vars["Criminal_Outpost"].upBound = 0
@@ -222,7 +221,7 @@ def set_color_if_negative(variable, entry, color="red"):
             entry.config(fg=original_color)
     variable.trace_add("write", callback)
 
-def make_var_and_entry(frame, modifiable=True, intVar=None, **kwargs):
+def make_var_and_entry(frame, modifiable=True, intVar=None, width=7, **kwargs):
     if intVar is None:
         intVar = not modifiable
     if intVar:
@@ -231,7 +230,7 @@ def make_var_and_entry(frame, modifiable=True, intVar=None, **kwargs):
         variable = tkinter.StringVar()
     entry = tkinter.Entry(frame, textvariable=variable,
                           validate="key", validatecommand=(vcmd, "%P"),
-                          width=10, justify=tkinter.RIGHT, **kwargs)
+                          width=width, justify=tkinter.RIGHT, **kwargs)
     if modifiable:
         entry.bind("<FocusOut>", lambda event, var=variable: on_focus_out(event, var))
     else:
@@ -333,13 +332,13 @@ button.pack(pady=7)
 building_frame = tkinter.Frame(root)
 building_frame.pack(padx=10, pady=5)
 
-header = [ tkinter.Label(building_frame, text="Category"),
-           tkinter.Label(building_frame, text="Building"),
-           tkinter.Label(building_frame, text="Already built"),
-           tkinter.Label(building_frame, text="Total at least"),
-           tkinter.Label(building_frame, text="Total at most"),
-           tkinter.Label(building_frame, text="To build"),
-           tkinter.Label(building_frame, text="Total")
+header = [ tkinter.Message(building_frame, text="Category", width=150, anchor="n"),
+           tkinter.Message(building_frame, text="Building", width=250, anchor="n"),
+           tkinter.Message(building_frame, text="Already built", width=70, anchor="n"),
+           tkinter.Message(building_frame, text="Total at least", width=70, anchor="n"),
+           tkinter.Message(building_frame, text="Total at most", width=70, anchor="n"),
+           tkinter.Message(building_frame, text="To build", width=70, anchor="n"),
+           tkinter.Message(building_frame, text="Total", width=70, anchor="n")
           ]
 for i, label in enumerate(header):
     label.grid(row=0, column=i)
@@ -369,7 +368,7 @@ class Building_Row:
         self.building_choice = ttk.Combobox(building_frame, textvariable=self.name_var, width=25, state="readonly",
                                             values=values)
         self.already_present_var, self.already_present_entry = make_var_and_entry(building_frame, intVar=True)
-        self.at_least_var, self.at_least_entry = make_var_and_entry(building_frame )
+        self.at_least_var, self.at_least_entry = make_var_and_entry(building_frame)
         self.at_most_var, self.at_most_entry = make_var_and_entry(building_frame)
         self.to_build_var, self.to_build_entry = make_var_and_entry(building_frame, modifiable=False)
         self.total_var, self.total_entry = make_var_and_entry(building_frame, modifiable=False)
@@ -389,8 +388,16 @@ class Building_Row:
             # self.building_choice.config(state="disabled")
             # self.already_present_entry.config(state="readonly")
 
-    def pack(self, index):
-        self.index = index
+
+    def is_port(self):
+        building_name = data.from_printable(self.name_var.get())
+        return self.valid and data.is_port(all_buildings[building_name])
+
+    def pack(self, index=None):
+        if index is None:
+            index = self.index
+        else:
+            self.index = index
         self.category_choice.grid(row=index, column=0)
         self.building_choice.grid(row=index, column=1)
         self.already_present_entry.grid(row=index, column=2)
@@ -406,6 +413,10 @@ class Building_Row:
         if self.to_build_var.get() > 0:
             self.to_build_entry.config(fg="green")
 
+    def remove_result(self):
+        self.total_var.set(self.already_present_var.get())
+        self.to_build_entry.config(fg="black")
+
     def on_category_choice(self, var, index, mode):
         category = self.category_var.get()
         self.building_choice.config(values=data.to_printable_list(all_categories[category]))
@@ -417,8 +428,6 @@ class Building_Row:
             self.valid = True
             if self.first_station:
                 self.already_present_var.set(1)
-            else:
-                self.already_present_entry.focus()
             if self is building_input[-1]:
                 add_empty_building_row()
                 if self.delete_button is None and not self.first_station:
@@ -463,8 +472,7 @@ def clear_result():
         if row.is_result:
             row.delete()
         else:
-            row.total_var.set(row.already_present_var.get())
-            row.to_build_entry.config(fg="black")
+            row.remove_result()
     building_input = [ row for row in building_input if not row.is_result ]
     for i, row in enumerate(building_input):
         row.pack(i+1)
