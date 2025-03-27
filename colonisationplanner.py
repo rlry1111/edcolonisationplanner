@@ -128,7 +128,7 @@ def solve():
 
     # Computing system scores
     systemscores = {}
-    for score in all_scores:
+    for score in data.base_scores:
         if score != "construction_cost":
             systemscores[score] = pulp.lpSum(getattr(building, score) * all_values[building_name]
                                              for building_name, building in all_buildings.items())
@@ -136,6 +136,8 @@ def solve():
             # Do not count already present buildings for construction cost
             systemscores[score] = pulp.lpSum(getattr(building, score) * all_vars[building_name]
                                              for building_name, building in all_buildings.items())
+    for score in data.compound_scores:
+        systemscores[score] = data.compute_compound_score(score, systemscores)
 
     # Objective function
     if maximize in systemscores:
@@ -245,6 +247,7 @@ def printresult(text):
     current_text = resultlabel.cget("text")
     new_text = current_text + "\n" + text
     resultlabel.config(text=new_text)
+
 # tkinter setup
 def validate_input(P):
     return P.isdigit() or P == "" or P == "-" or (P[0] == "-" and P[1:].isdigit())
@@ -282,9 +285,9 @@ style.configure('.', font=("Eurostile", 12))
 ## style.configure('TEntry', fieldbackground=[("active", "black"), ("disabled", "red")])
 style.map('success.TEntry', fieldbackground=[])
 style.map('TEntry', fieldbackground=[])
-
 root.title("Elite Dangerous colonisation planner")
 root.geometry("1000x1000")
+
 maximizeinput = ttk.StringVar()
 frame = ttk.Frame(root)
 frame.pack(pady=5)
