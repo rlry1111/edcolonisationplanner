@@ -76,10 +76,8 @@ def solve():
         building_name = row.building_name
         already_present = row.already_present
         if already_present:
-            building = all_buildings[building_name]
-            all_values[building_name] += already_present
+            all_values[building_name] = all_values[building_name] + already_present
 
-            # initial_construction_cost += all_buildings[building_name].construction_cost * already_present
             if building_name in ["Pirate_Base", "Criminal_Outpost"] and not criminalinput.get():
                 resultlabel.config(text="Error: criminal outpost or pirate base already present, but you do not want criminal outposts to be built")
                 return False
@@ -198,6 +196,19 @@ def solve():
 
     for score in all_scores:
         resultvars[score].set(int(pulp.value(systemscores[score])))
+
+    nb_ports = 0
+    port_ordering_string = "Suggested port build order: "
+    for port_index in range(nb_ports_already_present, max_nb_ports):
+        for port_name, port_var in port_vars.items():
+            if pulp.value(port_var[port_index]) >= 1:
+                if nb_ports > 0:
+                    port_ordering_string += " --> "
+                nb_ports += 1
+                cost = max(6, 6*port_index) if all_buildings[port_name].T3points == "port" else max(3, 1+2*port_index)
+                port_ordering_string += f"{port_index+1}: {data.to_printable(port_name)}"
+    if nb_ports > 1:
+        printresult(port_ordering_string)
 
     return True
 
@@ -413,7 +424,7 @@ class Building_Row:
 
     @property
     def is_result(self):
-        return self.already_present_var.get() == 0 and self.at_least_var.get() == "" and self.at_most_var.get() == ""
+        return self.already_present == 0 and self.at_least_var.get() == "" and self.at_most_var.get() == ""
     @property
     def is_port(self):
         building_name = data.from_printable(self.name_var.get())
@@ -449,7 +460,7 @@ class Building_Row:
             self.to_build_entry.config(fg="green")
 
     def remove_result(self):
-        self.total_var.set(self.already_present_var.get())
+        self.to_build_var.set(0)
         self.to_build_entry.config(fg="black")
 
     def on_category_choice(self, var, index, mode):
