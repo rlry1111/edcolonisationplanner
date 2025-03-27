@@ -1,20 +1,33 @@
-import pulp
 import re
-import tkinter
-from tkinter import ttk
 import os
 import sys
 from collections import defaultdict
 
+import pulp
+
+import tkinter
+from tkinter import ttk
+import ttkbootstrap
+import pyglet
+
 from data import all_buildings, all_scores, all_categories
 import data
 
+#TODO
+#   Let the code select a starting system
+#   Add port economy (once Fdev fixes it)
+#   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
+
+pyglet.options['win32_gdi_font'] = True
 if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
     #I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
     cbc_path = os.path.join(sys._MEIPASS, "cbc.exe")
     solver = pulp.COIN_CMD(path=cbc_path)
+    font_path = os.path.join(sys._MEIPASS, "eurostile.TTF")
+    pyglet.font.add_file(font_path)
 else:
     solver = None
+    pyglet.font.add_file('eurostile.TTF')
 
 def convert_maybe(variable, default=None):
     value = variable.get()
@@ -235,29 +248,29 @@ def on_focus_out_integer(event, var):
         value = 0
     var.set(value)
 
-def set_color_if_negative(variable, entry, color="red"):
-    original_color = entry.cget("fg")
+def set_color_if_negative(variable, entry, color="red", color2="green"):
     def callback(var, index, mode):
         val = variable.get()
         if val < 0:
             entry.config(fg=color)
         else:
-            entry.config(fg=original_color)
+            entry.config(fg=color2)
     variable.trace_add("write", callback)
 
 # Main window
-root = tkinter.Tk()
+root = ttkbootstrap.Window(themename="darkly")
 vcmd = root.register(validate_input)
 vcmd_positive = root.register(validate_input_positive)
 root.title("Elite Dangerous colonisation planner")
-root.geometry("800x1000")
+root.geometry("1000x1000")
 maximizeinput = tkinter.StringVar()
 frame = tkinter.Frame(root)
 frame.pack(pady=5)
-label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("calibri", 12))
+label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("Eurostile", 12))
 label.pack(side="left")
 dropdown = tkinter.OptionMenu(frame, maximizeinput, *data.to_printable_list(all_scores))
 dropdown.pack(side="left")
+dropdown.config(font=("Eurostile", 10))
 
 minframes = {}
 minvars = {}
@@ -266,17 +279,17 @@ resultvars = {}
 
 constraint_frame = tkinter.Frame(root)
 constraint_frame.pack(padx=10, pady=5)
-tkinter.Label(constraint_frame, text="System Scores", font=("calibri", 12)).grid(column=0, columnspan=3, row=0)
-tkinter.Label(constraint_frame, text="min. value", font=("calibri", 12)).grid(column=1, row=1)
-tkinter.Label(constraint_frame, text="max. value", font=("calibri", 12)).grid(column=2, row=1)
-tkinter.Label(constraint_frame, text="solution value", font=("calibri", 12)).grid(column=3, row=1)
+tkinter.Label(constraint_frame, text="System Scores", font=("Eurostile", 12)).grid(column=0, columnspan=3, row=0)
+tkinter.Label(constraint_frame, text="min. value", font=("Eurostile", 12)).grid(column=1, row=1)
+tkinter.Label(constraint_frame, text="max. value", font=("Eurostile", 12)).grid(column=2, row=1)
+tkinter.Label(constraint_frame, text="solution value", font=("Eurostile", 12)).grid(column=3, row=1)
 for i, name in enumerate(all_scores):
     minvars[name] = tkinter.StringVar(value="")
     maxvars[name] = tkinter.StringVar(value="")
     resultvars[name] = tkinter.IntVar()
 
     display_name = data.to_printable(name)
-    label = tkinter.Label(constraint_frame, text=display_name, font=("calibri", 12))
+    label = tkinter.Label(constraint_frame, text=display_name, font=("Eurostile", 12))
     label.grid(column=0, row=2+i)
     entry_min = tkinter.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
     entry_max = tkinter.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
@@ -295,21 +308,21 @@ groundfacilityslotsinput = tkinter.IntVar()
 asteroidslotsinput = tkinter.IntVar()
 frame20 = tkinter.Frame(root)
 frame20.pack(pady=5)
-label = tkinter.Label(frame20, text="Number of available orbital facility slots (excluding already built facilities):", font=("calibri", 12))
+label = tkinter.Label(frame20, text="Number of available orbital facility slots (excluding already built facilities):", font=("Eurostile", 12))
 label.pack(side="left")
 entry = tkinter.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=orbitalfacilityslotsinput: on_focus_out(event, var))
 frame21 = tkinter.Frame(root)
 frame21.pack(pady=5)
-label = tkinter.Label(frame21, text="Number of available ground facility slots (excluding already built facilities):", font=("calibri", 12))
+label = tkinter.Label(frame21, text="Number of available ground facility slots (excluding already built facilities):", font=("Eurostile", 12))
 label.pack(side="left")
 entry = tkinter.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=groundfacilityslotsinput: on_focus_out(event, var))
 frame22 = tkinter.Frame(root)
 frame22.pack(pady=5)
-label = tkinter.Label(frame22, text="Number of available slots for asteroid bases (excluding already built asteroid bases):", font=("calibri", 12))
+label = tkinter.Label(frame22, text="Number of available slots for asteroid bases (excluding already built asteroid bases):", font=("Eurostile", 12))
 label.pack(side="left")
 entry = tkinter.Entry(frame22, textvariable=asteroidslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
@@ -318,7 +331,7 @@ entry.bind("<FocusOut>", lambda event, var=asteroidslotsinput: on_focus_out(even
 T2points_variable = tkinter.IntVar()
 frame23 = tkinter.Frame(root)
 frame23.pack(pady=5)
-label = tkinter.Label(frame23, text="Number of available T2 construction points:", font=("calibri", 12))
+label = tkinter.Label(frame23, text="Number of available T2 construction points:", font=("Eurostile", 12))
 label.pack(side="left")
 T2points_entry = tkinter.Entry(frame23, textvariable=T2points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
 T2points_entry.pack(side="left")
@@ -326,7 +339,7 @@ T2points_entry.pack(side="left")
 T3points_variable = tkinter.IntVar()
 frame24 = tkinter.Frame(root)
 frame24.pack(pady=5)
-label = tkinter.Label(frame24, text="Number of available T3 construction points:", font=("calibri", 12))
+label = tkinter.Label(frame24, text="Number of available T3 construction points:", font=("Eurostile", 12))
 label.pack(side="left")
 T3points_entry = tkinter.Entry(frame24, textvariable=T3points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
 T3points_entry.pack(side="left")
@@ -344,13 +357,13 @@ def on_auto_construction_points(*args):
         T3points_entry.config(state=tkinter.NORMAL)
 
 auto_construction_points = tkinter.BooleanVar(value=True)
-construction_points_checkbox = tkinter.Checkbutton(root, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points, font=("calibri", 12))
+construction_points_checkbox = tkinter.Checkbutton(root, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points, font=("Eurostile", 12))
 construction_points_checkbox.pack(pady=5)
 auto_construction_points.trace_add("write", on_auto_construction_points)
 
 
 criminalinput = tkinter.BooleanVar()
-checkbox = tkinter.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput, font=("calibri", 12))
+checkbox = tkinter.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput, font=("Eurostile", 12))
 checkbox.pack(pady=5)
 
 def on_solve():
@@ -358,20 +371,20 @@ def on_solve():
     if res:
         add_empty_building_row()
 
-button = tkinter.Button(root, text="Solve for a system", command=on_solve)
+button = tkinter.Button(root, text="Solve for a system", command=on_solve, font=("Eurostile", 12))
 button.pack(pady=7)
 
 
 building_frame = tkinter.Frame(root)
 building_frame.pack(padx=10, pady=5)
 
-header = [ tkinter.Message(building_frame, text="Category", width=150, anchor="n"),
-           tkinter.Message(building_frame, text="Building", width=250, anchor="n"),
-           tkinter.Message(building_frame, text="Already built", width=70, anchor="n"),
-           tkinter.Message(building_frame, text="Total at least", width=70, anchor="n"),
-           tkinter.Message(building_frame, text="Total at most", width=70, anchor="n"),
-           tkinter.Message(building_frame, text="To build", width=70, anchor="n"),
-           tkinter.Message(building_frame, text="Total", width=70, anchor="n")
+header = [ tkinter.Message(building_frame, text="Category", width=150, anchor="n", font=("Eurostile", 12)),
+           tkinter.Message(building_frame, text="Building", width=250, anchor="n", font=("Eurostile", 12)),
+           tkinter.Message(building_frame, text="Already built", width=70, anchor="n", font=("Eurostile", 12)),
+           tkinter.Message(building_frame, text="Total at least", width=70, anchor="n", font=("Eurostile", 12)),
+           tkinter.Message(building_frame, text="Total at most", width=70, anchor="n", font=("Eurostile", 12)),
+           tkinter.Message(building_frame, text="To build", width=70, anchor="n", font=("Eurostile", 12)),
+           tkinter.Message(building_frame, text="Total", width=70, anchor="n", font=("Eurostile", 12))
           ]
 for i, label in enumerate(header):
     label.grid(row=0, column=i)
@@ -391,7 +404,7 @@ class Building_Row:
         self.first_station = firststation
 
         if firststation:
-            self.category_choice = tkinter.Label(building_frame, text="First Station", width=15, font=("calibri", 12))
+            self.category_choice = tkinter.Label(building_frame, text="First Station", width=15, font=("Eurostile", 12))
         else:
             self.category_var = tkinter.StringVar(value="All" if result_building is None else "Result")
             self.category_choice = ttk.Combobox(building_frame, textvariable=self.category_var,
@@ -579,7 +592,7 @@ def update_values_from_building_input():
         T2points_variable.set(T2points)
         T3points_variable.set(T3points)
 
-resultlabel = tkinter.Label(root, text="", font=("calibri", 12))
+resultlabel = tkinter.Label(root, text="", font=("Eurostile", 12))
 resultlabel.pack(pady=10)
 root.mainloop()
 
