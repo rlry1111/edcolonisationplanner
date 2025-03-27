@@ -6,8 +6,7 @@ from collections import defaultdict
 import pulp
 
 import tkinter
-from tkinter import ttk
-import ttkbootstrap
+import ttkbootstrap as ttk
 import pyglet
 
 from data import all_buildings, all_scores, all_categories
@@ -36,7 +35,6 @@ def convert_maybe(variable, default=None):
 
 def solve():
     #requirements
-    resultlabel.config(text="")
     M = 10000
 
     # Get data from the Entry widgets
@@ -210,17 +208,17 @@ def solve():
     for score in all_scores:
         resultvars[score].set(int(pulp.value(systemscores[score])))
 
-    nb_ports = 0
+    port_types = set()
     port_ordering_string = "Suggested port build order: "
     for port_index in range(nb_ports_already_present, max_nb_ports):
         for port_name, port_var in port_vars.items():
             if pulp.value(port_var[port_index]) >= 1:
-                if nb_ports > 0:
+                if port_types:
                     port_ordering_string += " --> "
-                nb_ports += 1
+                port_types.add(port_name)
                 cost = max(6, 6*port_index) if all_buildings[port_name].T3points == "port" else max(3, 1+2*port_index)
                 port_ordering_string += f"{port_index+1}: {data.to_printable(port_name)}"
-    if nb_ports > 1:
+    if len(port_types) > 1:
         printresult(port_ordering_string)
 
     return True
@@ -248,100 +246,105 @@ def on_focus_out_integer(event, var):
         value = 0
     var.set(value)
 
-def set_color_if_negative(variable, entry, color="red", color2="green"):
+def set_style_if_negative(variable, entry, style1="danger", style2="success"):
     def callback(var, index, mode):
         val = variable.get()
         if val < 0:
-            entry.config(fg=color)
+            entry.config(bootstyle=style1)
         else:
-            entry.config(fg=color2)
+            entry.config(bootstyle=style2)
     variable.trace_add("write", callback)
 
 # Main window
-root = ttkbootstrap.Window(themename="darkly")
+root = ttk.Window(themename="darkly")
 vcmd = root.register(validate_input)
 vcmd_positive = root.register(validate_input_positive)
+style = ttk.Style()
+style.configure('.', font=("Eurostile", 12))
+## style.configure('TEntry', fieldbackground=[("active", "black"), ("disabled", "red")])
+style.map('success.TEntry', fieldbackground=[])
+style.map('TEntry', fieldbackground=[])
+
 root.title("Elite Dangerous colonisation planner")
 root.geometry("1000x1000")
-maximizeinput = tkinter.StringVar()
-frame = tkinter.Frame(root)
+maximizeinput = ttk.StringVar()
+frame = ttk.Frame(root)
 frame.pack(pady=5)
-label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("Eurostile", 12))
+label = ttk.Label(frame, text="Select what you are trying to optimise:")
 label.pack(side="left")
-dropdown = tkinter.OptionMenu(frame, maximizeinput, *data.to_printable_list(all_scores))
+dropdown = ttk.OptionMenu(frame, maximizeinput, *data.to_printable_list(all_scores))
 dropdown.pack(side="left")
-dropdown.config(font=("Eurostile", 10))
 
 minframes = {}
 minvars = {}
 maxvars = {}
 resultvars = {}
 
-constraint_frame = tkinter.Frame(root)
+constraint_frame = ttk.Frame(root)
 constraint_frame.pack(padx=10, pady=5)
-tkinter.Label(constraint_frame, text="System Scores", font=("Eurostile", 12)).grid(column=0, columnspan=3, row=0)
-tkinter.Label(constraint_frame, text="min. value", font=("Eurostile", 12)).grid(column=1, row=1)
-tkinter.Label(constraint_frame, text="max. value", font=("Eurostile", 12)).grid(column=2, row=1)
-tkinter.Label(constraint_frame, text="solution value", font=("Eurostile", 12)).grid(column=3, row=1)
+ttk.Label(constraint_frame, text="System Scores").grid(column=0, columnspan=3, row=0)
+ttk.Label(constraint_frame, text="min. value").grid(column=1, row=1)
+ttk.Label(constraint_frame, text="max. value").grid(column=2, row=1)
+ttk.Label(constraint_frame, text="solution value").grid(column=3, row=1)
 for i, name in enumerate(all_scores):
-    minvars[name] = tkinter.StringVar(value="")
-    maxvars[name] = tkinter.StringVar(value="")
-    resultvars[name] = tkinter.IntVar()
+    minvars[name] = ttk.StringVar(value="")
+    maxvars[name] = ttk.StringVar(value="")
+    resultvars[name] = ttk.IntVar()
 
     display_name = data.to_printable(name)
-    label = tkinter.Label(constraint_frame, text=display_name, font=("Eurostile", 12))
-    label.grid(column=0, row=2+i)
-    entry_min = tkinter.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
-    entry_max = tkinter.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
-    entry_min.grid(column=1, row=2+i)
-    entry_max.grid(column=2, row=2+i)
+    label = ttk.Label(constraint_frame, text=display_name)
+    label.grid(column=0, row=2+i, pady=2, padx=2)
+    entry_min = ttk.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT)
+    entry_max = ttk.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT)
+    entry_min.grid(column=1, row=2+i, pady=2, padx=2)
+    entry_max.grid(column=2, row=2+i, pady=2, padx=2)
     entry_min.bind("<FocusOut>", lambda event, var=minvars[name]: on_focus_out(event, var))
     entry_max.bind("<FocusOut>", lambda event, var=maxvars[name]: on_focus_out(event, var))
 
-    result = tkinter.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=tkinter.RIGHT)
-    result.grid(column=3, row=2+i, padx=5)
+    result = ttk.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=ttk.RIGHT)
+    result.grid(column=3, row=2+i, padx=5, pady=2)
     result.config(state="readonly")
-    set_color_if_negative(resultvars[name], result)
+    set_style_if_negative(resultvars[name], result)
 
-orbitalfacilityslotsinput = tkinter.IntVar()
-groundfacilityslotsinput = tkinter.IntVar()
-asteroidslotsinput = tkinter.IntVar()
-frame20 = tkinter.Frame(root)
+orbitalfacilityslotsinput = ttk.IntVar()
+groundfacilityslotsinput = ttk.IntVar()
+asteroidslotsinput = ttk.IntVar()
+frame20 = ttk.Frame(root)
 frame20.pack(pady=5)
-label = tkinter.Label(frame20, text="Number of available orbital facility slots (excluding already built facilities):", font=("Eurostile", 12))
+label = ttk.Label(frame20, text="Number of available orbital facility slots (excluding already built facilities):")
 label.pack(side="left")
-entry = tkinter.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
+entry = ttk.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=orbitalfacilityslotsinput: on_focus_out(event, var))
-frame21 = tkinter.Frame(root)
+frame21 = ttk.Frame(root)
 frame21.pack(pady=5)
-label = tkinter.Label(frame21, text="Number of available ground facility slots (excluding already built facilities):", font=("Eurostile", 12))
+label = ttk.Label(frame21, text="Number of available ground facility slots (excluding already built facilities):")
 label.pack(side="left")
-entry = tkinter.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
+entry = ttk.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=groundfacilityslotsinput: on_focus_out(event, var))
-frame22 = tkinter.Frame(root)
+frame22 = ttk.Frame(root)
 frame22.pack(pady=5)
-label = tkinter.Label(frame22, text="Number of available slots for asteroid bases (excluding already built asteroid bases):", font=("Eurostile", 12))
+label = ttk.Label(frame22, text="Number of available slots for asteroid bases (excluding already built asteroid bases):")
 label.pack(side="left")
-entry = tkinter.Entry(frame22, textvariable=asteroidslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
+entry = ttk.Entry(frame22, textvariable=asteroidslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=asteroidslotsinput: on_focus_out(event, var))
 
-T2points_variable = tkinter.IntVar()
-frame23 = tkinter.Frame(root)
+T2points_variable = ttk.IntVar()
+frame23 = ttk.Frame(root)
 frame23.pack(pady=5)
-label = tkinter.Label(frame23, text="Number of available T2 construction points:", font=("Eurostile", 12))
+label = ttk.Label(frame23, text="Number of available T2 construction points:")
 label.pack(side="left")
-T2points_entry = tkinter.Entry(frame23, textvariable=T2points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
+T2points_entry = ttk.Entry(frame23, textvariable=T2points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
 T2points_entry.pack(side="left")
 
-T3points_variable = tkinter.IntVar()
-frame24 = tkinter.Frame(root)
+T3points_variable = ttk.IntVar()
+frame24 = ttk.Frame(root)
 frame24.pack(pady=5)
-label = tkinter.Label(frame24, text="Number of available T3 construction points:", font=("Eurostile", 12))
+label = ttk.Label(frame24, text="Number of available T3 construction points:")
 label.pack(side="left")
-T3points_entry = tkinter.Entry(frame24, textvariable=T3points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
+T3points_entry = ttk.Entry(frame24, textvariable=T3points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
 T3points_entry.pack(side="left")
 
 T2points_entry.config(state="readonly")
@@ -353,17 +356,17 @@ def on_auto_construction_points(*args):
         T2points_entry.config(state="readonly")
         T3points_entry.config(state="readonly")
     else:
-        T2points_entry.config(state=tkinter.NORMAL)
-        T3points_entry.config(state=tkinter.NORMAL)
+        T2points_entry.config(state=ttk.NORMAL)
+        T3points_entry.config(state=ttk.NORMAL)
 
-auto_construction_points = tkinter.BooleanVar(value=True)
-construction_points_checkbox = tkinter.Checkbutton(root, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points, font=("Eurostile", 12))
+auto_construction_points = ttk.BooleanVar(value=True)
+construction_points_checkbox = ttk.Checkbutton(root, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points)
 construction_points_checkbox.pack(pady=5)
 auto_construction_points.trace_add("write", on_auto_construction_points)
 
 
-criminalinput = tkinter.BooleanVar()
-checkbox = tkinter.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput, font=("Eurostile", 12))
+criminalinput = ttk.BooleanVar()
+checkbox = ttk.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput)
 checkbox.pack(pady=5)
 
 def on_solve():
@@ -371,20 +374,20 @@ def on_solve():
     if res:
         add_empty_building_row()
 
-button = tkinter.Button(root, text="Solve for a system", command=on_solve, font=("Eurostile", 12))
+button = ttk.Button(root, text="Solve for a system", command=on_solve)
 button.pack(pady=7)
 
 
-building_frame = tkinter.Frame(root)
+building_frame = ttk.Frame(root)
 building_frame.pack(padx=10, pady=5)
 
-header = [ tkinter.Message(building_frame, text="Category", width=150, anchor="n", font=("Eurostile", 12)),
-           tkinter.Message(building_frame, text="Building", width=250, anchor="n", font=("Eurostile", 12)),
-           tkinter.Message(building_frame, text="Already built", width=70, anchor="n", font=("Eurostile", 12)),
-           tkinter.Message(building_frame, text="Total at least", width=70, anchor="n", font=("Eurostile", 12)),
-           tkinter.Message(building_frame, text="Total at most", width=70, anchor="n", font=("Eurostile", 12)),
-           tkinter.Message(building_frame, text="To build", width=70, anchor="n", font=("Eurostile", 12)),
-           tkinter.Message(building_frame, text="Total", width=70, anchor="n", font=("Eurostile", 12))
+header = [ ttk.Label(building_frame, text="Category", wraplength=150, anchor=ttk.N),
+           ttk.Label(building_frame, text="Building", wraplength=250, anchor=ttk.N),
+           ttk.Label(building_frame, text="Already built", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="Total at least", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="Total at most", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="To build", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="Total", wraplength=70, anchor=ttk.N)
           ]
 for i, label in enumerate(header):
     label.grid(row=0, column=i)
@@ -399,14 +402,14 @@ class Building_Row:
             init_text = "Pick your first station"
 
         values = data.to_printable_list(values)
-        self.name_var = tkinter.StringVar(value=init_text)
+        self.name_var = ttk.StringVar(value=init_text)
         self.valid = False
         self.first_station = firststation
 
         if firststation:
-            self.category_choice = tkinter.Label(building_frame, text="First Station", width=15, font=("Eurostile", 12))
+            self.category_choice = ttk.Label(building_frame, text="First Station", width=15)
         else:
-            self.category_var = tkinter.StringVar(value="All" if result_building is None else "Result")
+            self.category_var = ttk.StringVar(value="All" if result_building is None else "Result")
             self.category_choice = ttk.Combobox(building_frame, textvariable=self.category_var,
                                                 width=15, state="readonly", values=list(all_categories.keys()))
             self.category_var.trace_add("write", self.on_category_choice)
@@ -457,24 +460,26 @@ class Building_Row:
             index = self.index
         else:
             self.index = index
-        self.category_choice.grid(row=index, column=0)
-        self.building_choice.grid(row=index, column=1)
-        self.already_present_entry.grid(row=index, column=2)
-        self.at_least_entry.grid(row=index, column=3)
-        self.at_most_entry.grid(row=index, column=4)
-        self.to_build_entry.grid(row=index, column=5)
-        self.total_entry.grid(row=index, column=6)
+        widgets = [ self.category_choice,
+                    self.building_choice, 
+                    self.already_present_entry,
+                    self.at_least_entry,
+                    self.at_most_entry,
+                    self.to_build_entry,
+                    self.total_entry ]
         if self.delete_button:
-            self.delete_button.grid(row=index, column=7)
+            widgets.append(self.delete_button)
+        for column, w in enumerate(widgets):
+            w.grid(row=index, column=column, padx=2, pady=2)
 
     def set_build_result(self, value):
         self.to_build_var.set(value)
         if value > 0:
-            self.to_build_entry.config(fg="green")
+            self.to_build_entry.config(bootstyle="success")
 
     def remove_result(self):
         self.to_build_var.set(0)
-        self.to_build_entry.config(fg="black")
+        self.to_build_entry.config(bootstyle="default")
 
     def on_category_choice(self, var, index, mode):
         category = self.category_var.get()
@@ -509,8 +514,8 @@ class Building_Row:
             self.delete_button.destroy()
 
     def create_delete_button(self):
-        self.delete_button = tkinter.Button(building_frame, text="X", padx=2, pady=0,
-                                            width=1, command=self.on_delete)
+        self.delete_button = ttk.Button(building_frame, text="X",
+                                        width=1, command=self.on_delete)
 
     def on_delete(self):
         idx = building_input.index(self)
@@ -521,10 +526,10 @@ class Building_Row:
             row.pack(i+1)
 
     def make_var_and_entry(self, modifiable=True, width=7, **kwargs):
-        variable = tkinter.StringVar()
-        entry = tkinter.Entry(building_frame, textvariable=variable,
-                              validate="key", validatecommand=(vcmd, "%P"),
-                              width=width, justify=tkinter.RIGHT, **kwargs)
+        variable = ttk.StringVar()
+        entry = ttk.Entry(building_frame, textvariable=variable,
+                          validate="key", validatecommand=(vcmd, "%P"),
+                          width=width, justify=ttk.RIGHT, **kwargs)
         if modifiable:
             entry.bind("<FocusOut>", lambda event, var=variable: on_focus_out(event, var))
         else:
@@ -532,10 +537,10 @@ class Building_Row:
         return (variable, entry)
 
     def make_int_var_and_entry(self, modifiable=True, width=7, **kwargs):
-        variable = tkinter.IntVar()
-        entry = tkinter.Entry(building_frame, textvariable=variable,
-                              validate="key", validatecommand=(vcmd_positive, "%P"),
-                              width=width, justify=tkinter.RIGHT, **kwargs)
+        variable = ttk.IntVar()
+        entry = ttk.Entry(building_frame, textvariable=variable,
+                          validate="key", validatecommand=(vcmd_positive, "%P"),
+                          width=width, justify=ttk.RIGHT, **kwargs)
         if modifiable:
             entry.bind("<FocusOut>", lambda event, var=variable: on_focus_out_integer(event, var))
         else:
@@ -550,6 +555,7 @@ def add_empty_building_row(**kwargs):
 
 def clear_result():
     global building_input
+    resultlabel.config(text="")
     for row in building_input:
         if row.is_result:
             row.delete()
@@ -592,10 +598,7 @@ def update_values_from_building_input():
         T2points_variable.set(T2points)
         T3points_variable.set(T3points)
 
-resultlabel = tkinter.Label(root, text="", font=("Eurostile", 12))
+resultlabel = ttk.Label(root, text="")
 resultlabel.pack(pady=10)
 root.mainloop()
 
-## TODOs:
-## "Clear result" button
-## Give output ordering
