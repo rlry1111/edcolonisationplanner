@@ -1,10 +1,16 @@
-import pulp
 import re
-import tkinter
-import ttkbootstrap
 import os
 import sys
+from collections import defaultdict
+
+import pulp
+
+import tkinter
+import ttkbootstrap as ttk
 import pyglet
+
+from data import all_buildings, all_scores, all_categories
+import data
 
 #TODO
 #   Let the code select a starting system
@@ -22,314 +28,200 @@ else:
     solver = None
     pyglet.font.add_file('eurostile.TTF')
 
+def convert_maybe(variable, default=None):
+    value = variable.get()
+    if value != "": return int(value)
+    return default
+
 def solve():
     #requirements
-    resultlabel.config(text="")
     M = 10000
-    inittier2conpoints = 0
-    inittier3conpoints = 0
-    initial_construction_cost = 0
-    minorbis = 0
-    minasteroidbase = 0
-    mincoriolis = 0
-    mincommercialoutpost = 0
-    minindustrialoutpost = 0
-    mincriminaloutpost = 0
-    mincivilianoutpost = 0
-    minscientificoutpost = 0
-    minmilitaryoutpost = 0
-    maxpiratebase = 0
-    maxcriminaloutpost = 0
-    maximize = maximizeinput.get()
 
-    def convert_maybe(value, default=None):
-        if value != "": return int(value)
-        return default
-
+    # Get data from the Entry widgets
     orbitalfacilityslots = orbitalfacilityslotsinput.get()
     groundfacilityslots = groundfacilityslotsinput.get()
     asteroidslots = asteroidslotsinput.get()
-    idk2 = criminalinput.get()
-    if idk2:
-        maxpiratebase = M
-        maxcriminaloutpost = M
-    idk = firststationinput.get()
-    initial_construction_cost = 18988
-    if idk == "orbis" or idk == "ocellus":
-        minorbis = 1
-        initial_construction_cost = 209122
-    elif idk == "asteroid base":
-        minasteroidbase  = 1
-        initial_construction_cost = 53723
-        if asteroidslots == 0:
-            resultlabel.config(text="Error: your starting station is an asteroid base but there are no slots for asteroid bases to be built")
-            return None
-    elif idk == "coriolis":
-        mincoriolis = 1
-        initial_construction_cost = 53723
-    elif idk == "commercial outpost":
-        mincommercialoutpost = 1
-    elif idk == "industrial outpost":
-        minindustrialoutpost = 1
-    elif idk == "criminal outpost":
-        mincriminaloutpost = 1
-        if maxcriminaloutpost == 0:
-            resultlabel.config(text="Error: your starting station is a criminal outpost but you do not want criminal outposts to be built")
-            return None
-    elif idk == "civilian outpost":
-        mincivilianoutpost = 1
-    elif idk == "scientific outpost":
-        minscientificoutpost = 1
-    elif idk == "military outpost":
-        minmilitaryoutpost = 1
-    else:
-        resultlabel.config(text="Error: One or more inputs are blank")
-        return None
+    maximize = data.from_printable(maximizeinput.get())
+    initial_T2points = T2points_variable.get()
+    initial_T3points = T3points_variable.get()
+
+    nb_ports_already_present = sum(row.already_present for row in building_input if row.is_port)
+    max_nb_ports = orbitalfacilityslots + groundfacilityslots + nb_ports_already_present
 
     #problem
-    direction = pulp.LpMinimize if maximize == "construction cost" else pulp.LpMaximize
+    direction = pulp.LpMinimize if maximize == "construction_cost" else pulp.LpMaximize
     prob = pulp.LpProblem("optimal_system_colonization_layout", direction)
 
     #create all the variables for each of the facilities
+    all_vars = {}   # for each building name, the variables that decide how many will be BUILT
+    all_values = {} # for each building name, the expressions that give how many will be in TOTAL (=all_var + already_present)
+    port_vars = {}  # for ports: for each port name, kth variable is 1 if the k-th port built is of this type
+    for n, b in all_buildings.items():
+        if not data.is_port(b):
+            all_vars[n] = pulp.LpVariable(n, cat='Integer', lowBound=0)
+        else:
+            # orbital and planetary ports, subject to cost increase
+            # Speculation for how construction points increase based on
+            # https://old.reddit.com/r/EliteDangerous/comments/1jfm0y6/psa_construction_points_costs_triple_after_third/
+            port_vars[n] = [ pulp.LpVariable(f"{n}_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+            all_vars[n] = pulp.lpSum(port_vars[n])
+        all_values[n] = all_vars[n]
 
-    # orbital and planetary ports, subject to cost increase
-    # Speculation for how construction points increase based on
-    # https://old.reddit.com/r/EliteDangerous/comments/1jfm0y6/psa_construction_points_costs_triple_after_third/
-    max_nb_ports = max(1, orbitalfacilityslots + groundfacilityslots) # may be a bit inefficient but should work
-    coriolis_vars      = [ pulp.LpVariable(f"Coriolis_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
-    orbis_vars         = [ pulp.LpVariable(f"Orbis_or_Ocellus_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
-    asteroidbase_vars  = [ pulp.LpVariable(f"Asteroid_Base_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
-    planetaryport_vars = [ pulp.LpVariable(f"Planetary_Port_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+    if not criminalinput.get():
+        all_vars["Pirate_Base"].upBound = 0
+        all_vars["Criminal_Outpost"].upBound = 0
 
-    coriolis = pulp.lpSum(coriolis_vars) + mincoriolis
-    orbis = pulp.lpSum(orbis_vars) + minorbis
-    asteroidbase = pulp.lpSum(asteroidbase_vars) + minasteroidbase
-    planetaryport = pulp.lpSum(planetaryport_vars)
+    #number of slots
+    prob += all_vars["Asteroid_Base"] <= asteroidslots, "asteroid slots"
+    prob += pulp.lpSum(all_vars[building_name]
+                       for building_name, building in all_buildings.items()
+                       if building.slot == "space") <= orbitalfacilityslots, "orbital facility slots"
+    prob += pulp.lpSum(all_vars[building_name]
+                       for building_name, building in all_buildings.items()
+                       if building.slot == "ground") <= groundfacilityslots, "ground facility slots"
 
-    prob += asteroidbase <= asteroidslots, "asteroid slots"
+    # Include already present buildings as constants in all_values[...]
+    for row in building_input:
+        if not row.valid:
+            continue
+        building_name = row.building_name
+        already_present = row.already_present
+        if already_present:
+            all_values[building_name] = all_values[building_name] + already_present
+
+            if building_name in ["Pirate_Base", "Criminal_Outpost"] and not criminalinput.get():
+                resultlabel.config(text="Error: criminal outpost or pirate base already present, but you do not want criminal outposts to be built")
+                return False
+
+    # Already present ports can not be built
+    for port_var in port_vars.values():
+        for k in range(nb_ports_already_present):
+            port_var[k].upBound = 0
+
+    # Constraints on the total number of facilities in the system
+    for row in building_input:
+        if not row.valid:
+            continue
+        building_name = row.building_name
+        at_least = convert_maybe(row.at_least_var)
+        if at_least is not None:
+            prob += all_values[building_name] >= at_least
+        at_most = convert_maybe(row.at_most_var)
+        if at_most is not None:
+            prob += all_values[building_name] <= at_most
+
+    # Consistency constraints for the port variables
     for k in range(max_nb_ports):
-        prob += coriolis_vars[k] + orbis_vars[k] + asteroidbase_vars[k] + planetaryport_vars[k] <= 1, f"port ordering limit {k+1}"
-        if k > 0:
-            prob += coriolis_vars[k] + orbis_vars[k] + asteroidbase_vars[k] + planetaryport_vars[k] <= coriolis_vars[k-1] + orbis_vars[k-1] + asteroidbase_vars[k-1] + planetaryport_vars[k-1], f"port ordering consistency {k+1}"
+        # Only one port can be k-th
+        prob += pulp.lpSum(port_var[k] for port_var in port_vars.values()) <= 1, f"port ordering limit {k+1}"
+        if k > nb_ports_already_present:
+            # No k-th port if there was no (k-1)-th port
+            prob += pulp.lpSum(port_var[k] for port_var in port_vars.values()) <= pulp.lpSum(port_var[k-1] for port_var in port_vars.values()), f"port ordering consistency {k+1}"
 
-    # orbital facilities
-    commercialoutpost = pulp.LpVariable('Commercial_Outpost', lowBound = mincommercialoutpost, cat='Integer')
-    industrialoutpost = pulp.LpVariable('Industrial_Outpost', lowBound = minindustrialoutpost, cat='Integer')
-    civilianoutpost = pulp.LpVariable('Civilian_Outpost', lowBound = mincivilianoutpost, cat='Integer')
-    scientificoutpost = pulp.LpVariable('Scientific_Outpost', lowBound = minscientificoutpost, cat='Integer')
-    militaryoutpost = pulp.LpVariable('Military_Outpost', lowBound = minmilitaryoutpost, cat='Integer')
-    satellite = pulp.LpVariable('Satellite', lowBound = 0, cat='Integer')
-    communicationstation = pulp.LpVariable('Communication_Station', lowBound = 0, cat='Integer')
-    spacefarm = pulp.LpVariable('Spacefarm', lowBound = 0, cat='Integer')
-    miningoutpost = pulp.LpVariable('Mining_Outpost', lowBound = 0, cat='Integer')
-    relaystation = pulp.LpVariable('Relay_Station', lowBound = 0, cat='Integer')
-    military = pulp.LpVariable('Military', lowBound = 0, cat='Integer')
-    securitystation = pulp.LpVariable('Security Station', lowBound = 0, cat='Integer')
-    government = pulp.LpVariable('Government', lowBound = 0, cat='Integer')
-    medical = pulp.LpVariable('Medical', lowBound = 0, cat='Integer')
-    researchstation = pulp.LpVariable('Research_Station', lowBound = 0, cat='Integer')
-    tourist = pulp.LpVariable('Tourist', lowBound = 0, cat='Integer')
-    bar = pulp.LpVariable('Space_Bar', lowBound = 0, cat='Integer')
-    criminaloutpost = pulp.LpVariable('Criminal Outpost', lowBound = mincriminaloutpost, upBound = maxcriminaloutpost, cat='Integer')
-    piratebase = pulp.LpVariable('Pirate_Base', lowBound = 0, upBound = maxpiratebase, cat='Integer')
-    #ground facilities
-    civilianplanetaryoutpost = pulp.LpVariable('Civilian_Planetary_Outpost', lowBound = 0, cat='Integer')
-    industrialplanetaryoutpost = pulp.LpVariable('Industrial_Planetary_Outpost', lowBound = 0, cat='Integer')
-    scientificplanetaryoutpost = pulp.LpVariable('Scientific_Planetary_Outpost', lowBound = 0, cat='Integer')
-
-    smallagriculturalsettlement = pulp.LpVariable('Small_Agricultural_Settlement', lowBound = 0, cat='Integer')
-    mediumagriculturalsettlement = pulp.LpVariable('Medium_Agricultural_Settlement', lowBound = 0, cat='Integer')
-    largeagriculturalsettlement = pulp.LpVariable('Large_Agricultural_Settlement', lowBound = 0, cat='Inte!ger')
-    smallextractionsettlement = pulp.LpVariable('Small_Extraction_Settlement', lowBound = 0, cat='Integer')
-    mediumextractionsettlement = pulp.LpVariable('Medium_Extraction_Settlement', lowBound = 0, cat='Integer')
-    largeextractionsettlement = pulp.LpVariable('Large_Extraction_Settlement', lowBound = 0, cat='Integer')
-    smallindustrialsettlement = pulp.LpVariable('Small_Industrial_Settlement', lowBound = 0, cat='Integer')
-    mediumindustrialsettlement = pulp.LpVariable('Medium_Industrial_Settlement', lowBound = 0, cat='Integer')
-    largeindustrialsettlement = pulp.LpVariable('Large_Industrial_Settlement', lowBound = 0, cat='Integer')
-    smallmilitarysettlement = pulp.LpVariable('Small_Military_Settlement', lowBound = 0, cat='Integer')
-    mediummilitarysettlement = pulp.LpVariable('Medium_Military_Settlement', lowBound = 0, cat='Integer')
-    largemilitarysettlement = pulp.LpVariable('Large_Military_Settlement', lowBound = 0, cat='Integer')
-    smallscientificsettlement = pulp.LpVariable('Small_Scientific_Settlement', lowBound = 0, cat='Integer')
-    mediumscientificsettlement = pulp.LpVariable('Medium_Scientific_Settlement', lowBound = 0, cat='Integer')
-    largescientificsettlement = pulp.LpVariable('Large_Scientific_Settlement', lowBound = 0, cat='Integer')
-    smalltourismsettlement = pulp.LpVariable('Small_Tourism_Settlement', lowBound = 0, cat='Integer')
-    mediumtourismsettlement = pulp.LpVariable('Medium_Tourism_Settlement', lowBound = 0, cat='Integer')
-    largetourismsettlement = pulp.LpVariable('Large_Tourism_Settlement', lowBound = 0, cat='Integer')
-    extractionhub = pulp.LpVariable('Extraction_Hub', lowBound = 0, cat='Integer')
-    civilianhub = pulp.LpVariable('Civilian_Hub', lowBound = 0, cat='Integer')
-    explorationhub = pulp.LpVariable('Exploration_Hub', lowBound = 0, cat='Integer')
-    outposthub = pulp.LpVariable('Outpost_Hub', lowBound = 0, cat='Integer')
-    scientifichub = pulp.LpVariable('Scientific_Hub', lowBound = 0, cat='Integer')
-    militaryhub = pulp.LpVariable('Military_Hub', lowBound = 0, cat='Integer')
-    refineryhub = pulp.LpVariable('Refinery_Hub', lowBound = 0, cat='Integer')
-    hightechhub = pulp.LpVariable('Hightech_Hub', lowBound = 0, cat='Integer')
-    industrialhub = pulp.LpVariable('Industrial_Hub', lowBound = 0, cat='Integer')
-
-    # compute system scores
+    # Computing system scores
     systemscores = {}
-    systemscores["initial population increase"] = (5 * orbis) + (coriolis) + (scientificoutpost) + (militaryoutpost) + (10 * planetaryport) + (2 * civilianplanetaryoutpost) + (industrialplanetaryoutpost) + (scientificplanetaryoutpost) + (asteroidbase)
-    systemscores["max population increase"] = (orbis) + (10 * planetaryport)
-    systemscores["security"] = (8 * securitystation) + (6 * military) + (2 * militaryoutpost) + (2 * government) + (communicationstation) + (relaystation) + (-1 * commercialoutpost) + (-1 * civilianoutpost) + (-2 * coriolis) + (-2 * bar) + (-3 * orbis) + (-3 * tourist) + (10 * militaryhub) + (6 * largemilitarysettlement) + (4 * mediummilitarysettlement) + (2 * smallmilitarysettlement) + (-1 * industrialplanetaryoutpost) + (-1 * scientificplanetaryoutpost) + (-1 * smalltourismsettlement) + (-1 * mediumtourismsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * explorationhub) + (-2 * civilianplanetaryoutpost) + (-2 * hightechhub) + (-2 * outposthub) + (-3 * planetaryport) + (-3 * civilianhub) + (-1 * asteroidbase) + (-4 * piratebase) + (-2 * criminaloutpost)
-    systemscores["tech level"] = (8 * researchstation) + (6 * orbis) + (3 * communicationstation) + (3 * scientificoutpost) + (3 * industrialoutpost) + (3 * medical) + (coriolis) + (10 * hightechhub) + (10 * largescientificsettlement) + (10 * scientifichub) + (6 * explorationhub) + (6 * mediumscientificsettlement) + (5 * scientificplanetaryoutpost) + (5 * planetaryport) + (3 * refineryhub) + (3 * smallscientificsettlement) + (3 * industrialhub) + (largeextractionsettlement) + (3 * asteroidbase)
-    systemscores["wealth"] = (7 * orbis) + (6 * tourist) + (3 * miningoutpost) + (2 * coriolis) + (2 * commercialoutpost) + (2 * bar) + (civilianoutpost) + (satellite) + (10 * extractionhub) + (7 * largeextractionsettlement) + (5 * planetaryport) + (5 * mediumextractionsettlement) + (5 * largetourismsettlement) + (5 * refineryhub) + (5 * industrialhub) + (2 * industrialplanetaryoutpost) + (2 * smallextractionsettlement) + (2 * largeindustrialsettlement) + (2 * mediumtourismsettlement) + (smalltourismsettlement) + (-2 * hightechhub) + (5 * asteroidbase) + (3 * piratebase) + (2 * criminaloutpost)
-    systemscores["standard of living"] = (6 * government) + (5 * orbis) + (5 * medical) + (5 * commercialoutpost) + (5 * spacefarm) + (3 * coriolis) + (3 * securitystation) + (3 * bar) + (civilianoutpost) + (satellite) + (-2 * miningoutpost) + (10 * largeagriculturalsettlement) + (6 * planetaryport) + (6 * mediumagriculturalsettlement) + (3 * civilianplanetaryoutpost) + (3 * outposthub) + (3 * civilianhub) + (3 * smallagriculturalsettlement) + (-2 * refineryhub) + (-2 * largeextractionsettlement) + (-4 * industrialhub) + (-4 * extractionhub) + (-4 * asteroidbase)
-    systemscores["development level"] = (8 * orbis) + (2 * government) + (2 * coriolis) + (2 * securitystation) + (2 * researchstation) + (2 * industrialoutpost) + (2 * tourist) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (10 * planetaryport) + (8 * largeindustrialsettlement) + (7 * refineryhub) + (5 * mediumindustrialsettlement) + (2 * outposthub) + (2 * civilianhub) + (2 * industrialhub) + (2 * extractionhub) + (2 * largescientificsettlement) + (2 * explorationhub) + (2 * largemilitarysettlement) + (2 * smallindustrialsettlement) + (mediumscientificsettlement) + (scientificplanetaryoutpost) + (smallscientificsettlement) + (7 * asteroidbase)
-    # values from Colonization Construction Details (By DaftMav) -- https://docs.google.com/spreadsheets/d/16_hh1G6Tb66OdS01Li0955lITp7yLleb3a8dmqVqq2o/edit?usp=sharing
-    systemscores["construction cost"] = 53723 * (coriolis + asteroidbase) + 209122 * orbis + 18988*(commercialoutpost + industrialoutpost + civilianoutpost + scientificoutpost + militaryoutpost + criminaloutpost) + 6721*(satellite + communicationstation + spacefarm + piratebase + miningoutpost + relaystation) + 10080*(military + securitystation + government + medical + researchstation + tourist + bar) + 36829*(civilianplanetaryoutpost + industrialplanetaryoutpost + scientificplanetaryoutpost) + 215882*planetaryport + 2840*(smallagriculturalsettlement + smallextractionsettlement + smallindustrialsettlement + smallmilitarysettlement + smallscientificsettlement + smalltourismsettlement) + 5690*(mediumagriculturalsettlement + mediumextractionsettlement + mediumindustrialsettlement + mediummilitarysettlement + mediumscientificsettlement + mediumtourismsettlement) + 8530*(largeagriculturalsettlement + largeextractionsettlement + largeindustrialsettlement + largemilitarysettlement + largescientificsettlement + largetourismsettlement) + 9800*(civilianhub + explorationhub + outposthub + extractionhub + scientifichub + militaryhub + refineryhub + hightechhub + industrialhub) - initial_construction_cost
+    for score in all_scores:
+        if score != "construction_cost":
+            systemscores[score] = pulp.lpSum(getattr(building, score) * all_values[building_name]
+                                             for building_name, building in all_buildings.items())
+        else:
+            # Do not count already present buildings for construction cost
+            systemscores[score] = pulp.lpSum(getattr(building, score) * all_vars[building_name]
+                                             for building_name, building in all_buildings.items())
 
-    #objective function
+    # Objective function
     if maximize in systemscores:
         prob += systemscores[maximize]
     else:
         resultlabel.config(text=f"Error: One or more inputs are blank: unknown objective '{maximize}'")
-        return None
+        return False
 
-    #minimum and maximum stats
-    for score in listofscores:
-        minvalue = convert_maybe(minvars[score].get())
-        maxvalue = convert_maybe(maxvars[score].get(), default=None)
+    # Constraints on minimum and maximum scores
+    for score in all_scores:
+        minvalue = convert_maybe(minvars[score])
+        maxvalue = convert_maybe(maxvars[score])
         if minvalue is not None:
             prob += systemscores[score] >= minvalue, "minimum " + score
         if maxvalue is not None:
             prob += systemscores[score] <= maxvalue, "maximum " + score
 
-    #number of slots
-    prob += coriolis + orbis + commercialoutpost + industrialoutpost + civilianoutpost + scientificoutpost + militaryoutpost + satellite + communicationstation + spacefarm + miningoutpost + relaystation + military + securitystation + government + medical + researchstation + tourist + bar + asteroidbase + criminaloutpost + piratebase <= orbitalfacilityslots + 1, "orbital facility slots"
-    prob += civilianplanetaryoutpost + industrialplanetaryoutpost + scientificplanetaryoutpost + planetaryport + smallagriculturalsettlement + mediumagriculturalsettlement + largeagriculturalsettlement + smallextractionsettlement + mediumextractionsettlement + largeextractionsettlement + smallindustrialsettlement + mediumindustrialsettlement + largeindustrialsettlement + smallmilitarysettlement + mediummilitarysettlement + largemilitarysettlement + smallscientificsettlement + mediumscientificsettlement + largescientificsettlement + smalltourismsettlement + mediumtourismsettlement + largetourismsettlement + extractionhub + civilianhub + explorationhub + outposthub + scientifichub + militaryhub + refineryhub + hightechhub + industrialhub <= groundfacilityslots, "ground facility slots"
+    # Constraints on the construction points
+    portsT2constructionpoints = pulp.lpSum( pulp.lpSum(port_var[k] for name, port_var in port_vars.items()
+                                                       if all_buildings[name].T2points == "port") * max(3, 2*k+1)
+                                            for k in range(max_nb_ports))
+    portsT3constructionpoints = pulp.lpSum( pulp.lpSum(port_var[k] for name, port_var in port_vars.items()
+                                                       if all_buildings[name].T3points == "port") * max(6, 6*k)
+                                            for k in range(max_nb_ports))
 
-    #construction points
-    portsT2constructionpoints = pulp.lpSum( (coriolis_vars[k] + asteroidbase_vars[k]) * max(3, 2*k+1) for k in range(max_nb_ports))
-    portsT3constructionpoints = pulp.lpSum( (orbis_vars[k] + planetaryport_vars[k]) * max(6, 6*k) for k in range(max_nb_ports))
-    prob += (industrialoutpost) + (spacefarm) + (civilianoutpost) + (satellite) + (relaystation) + (commercialoutpost) + (miningoutpost) + (communicationstation) + (scientificoutpost) + (militaryoutpost) + (mediumindustrialsettlement) + (smallindustrialsettlement) + (scientificplanetaryoutpost) + (mediumagriculturalsettlement) + (civilianplanetaryoutpost) + (smallagriculturalsettlement) + (mediummilitarysettlement) + (smallmilitarysettlement) + (industrialplanetaryoutpost) + (mediumextractionsettlement) + (smallextractionsettlement) + (-1 * government) + (-1 * securitystation) + (-1 * researchstation) + (-1 * tourist) + (-1 * medical) + (-1 * bar) + (-1 * military) + (-1 * largeindustrialsettlement) + (-1 * largescientificsettlement) + (-1 * largemilitarysettlement) + (-1 * largeagriculturalsettlement) + (-1 * largeextractionsettlement) + (-1 * largetourismsettlement) + (-1 * refineryhub) + (-1 * outposthub) + (-1 * civilianhub) + (-1 * industrialhub) + (-1 * extractionhub) + (-1 * explorationhub) + (-1 * mediumscientificsettlement) + (-1 * smallscientificsettlement) + (-1 * hightechhub) + (-1 * scientifichub) + (-1 * militaryhub) + (-1 * mediumtourismsettlement) + (-1 * smalltourismsettlement) + piratebase + criminaloutpost - portsT2constructionpoints >= 0, "tier 2 construction points"
-    prob += (coriolis) + (government) + (securitystation) + (researchstation) + (tourist) + (medical) + (bar) + (military) + (2 * largeindustrialsettlement) + (2 * largescientificsettlement) + (2 * largemilitarysettlement) + (2 * largeagriculturalsettlement) + (2 * largeextractionsettlement) + (2 * largetourismsettlement) + (refineryhub) + (outposthub) + (civilianhub) + (industrialhub) + (extractionhub) + (explorationhub) + (mediumscientificsettlement) + (smallscientificsettlement) + (hightechhub) + (scientifichub) + (militaryhub) + (mediumtourismsettlement) + (smalltourismsettlement) + asteroidbase - portsT3constructionpoints >= 0, "tier 3 construction points"
+    prob += pulp.lpSum( building.T2points * all_vars[name]
+                        for name, building in all_buildings.items()
+                        if building.T2points != "port" ) - portsT2constructionpoints + initial_T2points >= 0, "tier 2 construction points"
+    prob += pulp.lpSum( building.T3points * all_vars[name]
+                        for name, building in all_buildings.items()
+                        if building.T3points != "port" ) - portsT3constructionpoints + initial_T3points >= 0, "tier 3 construction points"
 
     #sort out dependencies for facilities
-    b1 = pulp.LpVariable("b1", cat="Binary")
-    b2 = pulp.LpVariable("b2", cat="Binary")
-    b3 = pulp.LpVariable("b3", cat="Binary")
-    prob += smalltourismsettlement <= M * b1
-    prob += smalltourismsettlement >= b1
-    prob += mediumtourismsettlement <= M * b2
-    prob += mediumtourismsettlement >= b2
-    prob += largetourismsettlement <= M * b3
-    prob += largetourismsettlement >= b3
-    any_positive1 = pulp.LpVariable("any_positive1", cat="Binary")
-    prob += any_positive1 >= b1
-    prob += any_positive1 >= b2
-    prob += any_positive1 >= b3
-    prob += any_positive1 <= M * (b1 + b2 + b3)
-    prob += tourist <= M * any_positive1
-    b4 = pulp.LpVariable("b4", cat="Binary")
-    b5 = pulp.LpVariable("b5", cat="Binary")
-    b6 = pulp.LpVariable("b6", cat="Binary")
-    prob += smallscientificsettlement <= M * b4
-    prob += smallscientificsettlement >= b4
-    prob += mediumscientificsettlement <= M * b5
-    prob += mediumscientificsettlement >= b5
-    prob += largescientificsettlement <= M * b6
-    prob += largescientificsettlement >= b6
-    any_positive2 = pulp.LpVariable("any_positive2", cat="Binary")
-    prob += any_positive2 >= b4
-    prob += any_positive2 >= b5
-    prob += any_positive2 >= b6
-    prob += any_positive2 <= M * (b4 + b5 + b6)
-    prob += researchstation <= M * any_positive2
-    b7 = pulp.LpVariable("b7", cat="Binary")
-    b8 = pulp.LpVariable("b8", cat="Binary")
-    b9 = pulp.LpVariable("b9", cat="Binary")
-    prob += smallmilitarysettlement <= M * b7
-    prob += smallmilitarysettlement >= b7
-    prob += mediummilitarysettlement <= M * b8
-    prob += mediummilitarysettlement >= b8
-    prob += largemilitarysettlement <= M * b9
-    prob += largemilitarysettlement >= b9
-    any_positive3 = pulp.LpVariable("any_positive3", cat="Binary")
-    prob += any_positive3 >= b7
-    prob += any_positive3 >= b8
-    prob += any_positive3 >= b9
-    prob += any_positive3 <= M * (b7 + b8 + b9)
-    prob += military <= M * any_positive3
-    b10 = pulp.LpVariable("b10", cat="Binary")
-    prob += relaystation <= M * b10
-    prob += relaystation >= b10
-    prob += securitystation <= M * b10
-    b11 = pulp.LpVariable("b11", cat="Binary")
-    prob += spacefarm <= M * b11
-    prob += spacefarm >= b11
-    prob += outposthub <= M * b11
-    b12 = pulp.LpVariable("b12", cat="Binary")
-    b13 = pulp.LpVariable("b13", cat="Binary")
-    b14 = pulp.LpVariable("b14", cat="Binary")
-    prob += smallextractionsettlement <= M * b12
-    prob += smallextractionsettlement >= b12
-    prob += mediumextractionsettlement <= M * b13
-    prob += mediumextractionsettlement >= b13
-    prob += largeextractionsettlement <= M * b14
-    prob += largeextractionsettlement >= b14
-    any_positive4 = pulp.LpVariable("any_positive4", cat="Binary")
-    prob += any_positive4 >= b12
-    prob += any_positive4 >= b13
-    prob += any_positive4 >= b14
-    prob += any_positive4 <= M * (b12 + b13 + b14)
-    prob += extractionhub <= M * any_positive4
-    b15 = pulp.LpVariable("b15", cat="Binary")
-    b16 = pulp.LpVariable("b16", cat="Binary")
-    b17 = pulp.LpVariable("b17", cat="Binary")
-    prob += smallagriculturalsettlement <= M * b15
-    prob += smallagriculturalsettlement >= b15
-    prob += mediumagriculturalsettlement <= M * b16
-    prob += mediumagriculturalsettlement >= b16
-    prob += largeagriculturalsettlement <= M * b17
-    prob += largeagriculturalsettlement >= b17
-    any_positive5 = pulp.LpVariable("any_positive5", cat="Binary")
-    prob += any_positive5 >= b15
-    prob += any_positive5 >= b16
-    prob += any_positive5 >= b17
-    prob += any_positive5 <= M * (b15 + b16 + b17)
-    prob += civilianhub <= M * any_positive5
-    b18 = pulp.LpVariable("b18", cat="Binary")
-    prob += miningoutpost <= M * b18
-    prob += miningoutpost >= b18
-    prob += industrialhub <= M * b18
-    b19 = pulp.LpVariable("b19", cat="Binary")
-    prob += military <= M * b19
-    prob += military >= b19
-    prob += militaryhub <= M * b19
-    b20 = pulp.LpVariable("b20", cat="Binary")
-    prob += satellite <= M * b20
-    prob += satellite >= b20
-    prob += smalltourismsettlement <= M * b20
-    prob += mediumtourismsettlement <= M * b20
-    prob += largetourismsettlement <= M * b20
-    b21 = pulp.LpVariable("b21", cat="Binary")
-    prob += communicationstation <= M * b21
-    prob += communicationstation >= b21
-    prob += explorationhub <= M * b21
-    #solve
+    indicator_dependency_variables = {}
+    ap_counter = 1
+    for target_name, target_building in all_buildings.items():
+        if target_building.dependencies:
+            deps = tuple(target_building.dependencies)
+            if  deps not in indicator_dependency_variables:
+                individual_variables = [ (name, pulp.LpVariable(f"indic {name}", cat="Binary"))
+                                         for name in target_building.dependencies ]
+                for name, bool_var in individual_variables:
+                    prob += all_values[name] <= M * bool_var
+                    prob += all_values[name] >= bool_var
+                if len(target_building.dependencies) == 1:
+                    any_positive = individual_variables[0][1]
+                else:
+                    any_positive = pulp.LpVariable(f"any_positive {ap_counter}", cat="Binary")
+                    ap_counter += 1
+                    for name, bool_var in individual_variables:
+                        prob += any_positive >= bool_var
+                    prob += any_positive <= M * pulp.lpSum(bool_var for name, bool_var in individual_variables)
+                indicator_dependency_variables[deps] = any_positive
+
+            prob += all_values[target_name] <= M * indicator_dependency_variables[deps]
+
+    # Solve the problem
     prob.solve(solver)
     if pulp.LpStatus[prob.status] == "Infeasible":
         resultlabel.config(text="Error: There is no possible system arrangement that can fit the conditions you have specified")
-        return None
-    printresult("Here is what you need to build in the system (including the first station) to achieve these requirements: ")
-    if pulp.value(coriolis + orbis + planetaryport + asteroidbase) > 0:
-        printresult("Note: build ports (e.g. orbis, ocellus, asteroid base, coriolis, planetary port) in order.")
-        printresult("e.g. build planetary port 1 before coriolis 2, build coriolis 2 before asteroid base 3, etc.")
-    if minorbis > 0:
-        printresult(f"Orbis or Ocellus 0 = {minorbis}")
-    if mincoriolis > 0:
-        printresult(f"Coriolis 0 = {mincoriolis}")
-    if minasteroidbase > 0:
-        printresult(f"Asteroid Base 0 = {minasteroidbase}")
-    for v in prob.variables():
-        if v.name != "__dummy":
-            if not bool(re.fullmatch(r"b\d+", v.name)) and not bool(re.fullmatch(r"any_positive\d+", v.name)) and v.name != "after_increase":
-                value = int(v.varValue)
-                name = v.name.replace("_", " ")
-                if value > 0:
-                    printresult(f"{name} = {value}")
+        return False
 
-    for score in listofscores:
+    clear_result()
+    for building_name in all_buildings.keys():
+        value = int(pulp.value(all_vars[building_name]))
+        if value <= 0:
+            continue
+        result_row = None
+        for row in reversed(building_input): # Makes sure I finish with the First Station
+            if row.building_name == building_name:
+                result_row = row
+                break
+        if result_row is None:
+            add_empty_building_row(result_building=data.to_printable(building_name))
+            result_row = building_input[-1]
+        result_row.set_build_result(value)
+
+    for score in all_scores:
         resultvars[score].set(int(pulp.value(systemscores[score])))
+
+    port_types = set()
+    port_ordering_string = "Suggested port build order: "
+    for port_index in range(nb_ports_already_present, max_nb_ports):
+        for port_name, port_var in port_vars.items():
+            if pulp.value(port_var[port_index]) >= 1:
+                if port_types:
+                    port_ordering_string += " --> "
+                port_types.add(port_name)
+                cost = max(6, 6*port_index) if all_buildings[port_name].T3points == "port" else max(3, 1+2*port_index)
+                port_ordering_string += f"{port_index+1}: {data.to_printable(port_name)}"
+    if len(port_types) > 1:
+        printresult(port_ordering_string)
+
+    return True
 
 def printresult(text):
     current_text = resultlabel.cget("text")
@@ -339,101 +231,374 @@ def printresult(text):
 def validate_input(P):
     return P.isdigit() or P == "" or P == "-" or (P[0] == "-" and P[1:].isdigit())
 
+def validate_input_positive(P):
+    return P.isdigit() or P == ""
+
 def on_focus_out(event, var):
     value = event.widget.get().lower()
+    if value == "-":
+        value = ""
     var.set(value)
 
-def set_color_if_negative(variable, entry, color="red", color2="green"):
+def on_focus_out_integer(event, var):
+    value = event.widget.get().lower()
+    if value == "-" or value == "":
+        value = 0
+    var.set(value)
+
+def set_style_if_negative(variable, entry, style1="danger", style2="success"):
     def callback(var, index, mode):
         val = variable.get()
         if val < 0:
-            entry.config(fg=color)
+            entry.config(bootstyle=style1)
         else:
-            entry.config(fg=color2)
+            entry.config(bootstyle=style2)
     variable.trace_add("write", callback)
 
-listofscores = ["initial population increase", "max population increase", "security", "tech level", "wealth", "standard of living", "development level", "construction cost"]
-
-root = ttkbootstrap.Window(themename="darkly")
+# Main window
+root = ttk.Window(themename="darkly")
 vcmd = root.register(validate_input)
+vcmd_positive = root.register(validate_input_positive)
+style = ttk.Style()
+style.configure('.', font=("Eurostile", 12))
+## style.configure('TEntry', fieldbackground=[("active", "black"), ("disabled", "red")])
+style.map('success.TEntry', fieldbackground=[])
+style.map('TEntry', fieldbackground=[])
+
 root.title("Elite Dangerous colonisation planner")
 root.geometry("1000x1000")
-maximizeinput = tkinter.StringVar()
-frame = tkinter.Frame(root)
+maximizeinput = ttk.StringVar()
+frame = ttk.Frame(root)
 frame.pack(pady=5)
-label = tkinter.Label(frame, text="Select what you are trying to optimise:", font=("Eurostile", 12))
+label = ttk.Label(frame, text="Select what you are trying to optimise:")
 label.pack(side="left")
-dropdown = tkinter.OptionMenu(frame, maximizeinput, *listofscores)
+dropdown = ttk.OptionMenu(frame, maximizeinput, *data.to_printable_list(all_scores))
 dropdown.pack(side="left")
-dropdown.config(font=("Eurostile", 10))
 
 minframes = {}
 minvars = {}
 maxvars = {}
 resultvars = {}
 
-constraint_frame = tkinter.Frame(root)
+constraint_frame = ttk.Frame(root)
 constraint_frame.pack(padx=10, pady=5)
-tkinter.Label(constraint_frame, text="System Scores",font=("Eurostile", 12)).grid(column=0, columnspan=3, row=0)
-tkinter.Label(constraint_frame, text="min. value",font=("Eurostile", 12)).grid(column=1, row=1)
-tkinter.Label(constraint_frame, text="max. value",font=("Eurostile", 12)).grid(column=2, row=1)
-tkinter.Label(constraint_frame, text="solution value",font=("Eurostile", 12)).grid(column=3, row=1)
-for i, name in enumerate(listofscores):
-    minvars[name] = tkinter.StringVar(value="")
-    maxvars[name] = tkinter.StringVar(value="")
-    resultvars[name] = tkinter.IntVar()
+ttk.Label(constraint_frame, text="System Scores").grid(column=0, columnspan=3, row=0)
+ttk.Label(constraint_frame, text="min. value").grid(column=1, row=1)
+ttk.Label(constraint_frame, text="max. value").grid(column=2, row=1)
+ttk.Label(constraint_frame, text="solution value").grid(column=3, row=1)
+for i, name in enumerate(all_scores):
+    minvars[name] = ttk.StringVar(value="")
+    maxvars[name] = ttk.StringVar(value="")
+    resultvars[name] = ttk.IntVar()
 
-    label = tkinter.Label(constraint_frame, text=name,font=("Eurostile", 12))
-    label.grid(column=0, row=2+i)
-    entry_min = tkinter.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
-    entry_max = tkinter.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=tkinter.RIGHT)
-    entry_min.grid(column=1, row=2+i)
-    entry_max.grid(column=2, row=2+i)
+    display_name = data.to_printable(name)
+    label = ttk.Label(constraint_frame, text=display_name)
+    label.grid(column=0, row=2+i, pady=2, padx=2)
+    entry_min = ttk.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT)
+    entry_max = ttk.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT)
+    entry_min.grid(column=1, row=2+i, pady=2, padx=2)
+    entry_max.grid(column=2, row=2+i, pady=2, padx=2)
     entry_min.bind("<FocusOut>", lambda event, var=minvars[name]: on_focus_out(event, var))
     entry_max.bind("<FocusOut>", lambda event, var=maxvars[name]: on_focus_out(event, var))
 
-    result = tkinter.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=tkinter.RIGHT)
-    result.grid(column=3, row=2+i, padx=5)
+    result = ttk.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=ttk.RIGHT)
+    result.grid(column=3, row=2+i, padx=5, pady=2)
     result.config(state="readonly")
-    set_color_if_negative(resultvars[name], result)
+    set_style_if_negative(resultvars[name], result)
 
-orbitalfacilityslotsinput = tkinter.IntVar()
-groundfacilityslotsinput = tkinter.IntVar()
-asteroidslotsinput = tkinter.IntVar()
-frame20 = tkinter.Frame(root)
+orbitalfacilityslotsinput = ttk.IntVar()
+groundfacilityslotsinput = ttk.IntVar()
+asteroidslotsinput = ttk.IntVar()
+frame20 = ttk.Frame(root)
 frame20.pack(pady=5)
-label = tkinter.Label(frame20, text="Enter the number of orbital facility slots your system has (excluding the first station):", font=("Eurostile", 12))
+label = ttk.Label(frame20, text="Number of available orbital facility slots (excluding already built facilities):")
 label.pack(side="left")
-entry = tkinter.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
+entry = ttk.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=orbitalfacilityslotsinput: on_focus_out(event, var))
-frame21 = tkinter.Frame(root)
+frame21 = ttk.Frame(root)
 frame21.pack(pady=5)
-label = tkinter.Label(frame21, text="Enter the number of ground facility slots your system has:", font=("Eurostile", 12))
+label = ttk.Label(frame21, text="Number of available ground facility slots (excluding already built facilities):")
 label.pack(side="left")
-entry = tkinter.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
+entry = ttk.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=groundfacilityslotsinput: on_focus_out(event, var))
-frame22 = tkinter.Frame(root)
+frame22 = ttk.Frame(root)
 frame22.pack(pady=5)
-label = tkinter.Label(frame22, text="Enter the number of slots your system has that can have asteroid bases (including the first station):", font=("Eurostile", 12))
+label = ttk.Label(frame22, text="Number of available slots for asteroid bases (excluding already built asteroid bases):")
 label.pack(side="left")
-entry = tkinter.Entry(frame22, textvariable=asteroidslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
+entry = ttk.Entry(frame22, textvariable=asteroidslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=asteroidslotsinput: on_focus_out(event, var))
-criminalinput = tkinter.BooleanVar()
-checkbox = tkinter.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput, font=("Eurostile", 12))
-checkbox.pack(pady=5)
-firststationinput = tkinter.StringVar()
-frame23 = tkinter.Frame(root)
+
+T2points_variable = ttk.IntVar()
+frame23 = ttk.Frame(root)
 frame23.pack(pady=5)
-label = tkinter.Label(frame23, text="Select your first station:", font=("Eurostile", 12))
+label = ttk.Label(frame23, text="Number of available T2 construction points:")
 label.pack(side="left")
-dropdown = tkinter.OptionMenu(frame23, firststationinput, "orbis", "ocellus", "asteroid base", "coriolis", "commercial outpost", "industrial outpost", "criminal outpost", "civilian outpost", "scientific outpost", "military outpost")
-dropdown.pack(side="left")
-dropdown.config(font=("Eurostile", 10))
-button = tkinter.Button(root, text="Solve for a system", command=lambda: solve(), font=("Eurostile", 10))
-button.pack(pady=5)
-resultlabel = tkinter.Label(root, text="", font=("Eurostile", 10))
-resultlabel.pack(pady=3)
+T2points_entry = ttk.Entry(frame23, textvariable=T2points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
+T2points_entry.pack(side="left")
+
+T3points_variable = ttk.IntVar()
+frame24 = ttk.Frame(root)
+frame24.pack(pady=5)
+label = ttk.Label(frame24, text="Number of available T3 construction points:")
+label.pack(side="left")
+T3points_entry = ttk.Entry(frame24, textvariable=T3points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
+T3points_entry.pack(side="left")
+
+T2points_entry.config(state="readonly")
+T3points_entry.config(state="readonly")
+
+def on_auto_construction_points(*args):
+    update_values_from_building_input()
+    if auto_construction_points.get():
+        T2points_entry.config(state="readonly")
+        T3points_entry.config(state="readonly")
+    else:
+        T2points_entry.config(state=ttk.NORMAL)
+        T3points_entry.config(state=ttk.NORMAL)
+
+auto_construction_points = ttk.BooleanVar(value=True)
+construction_points_checkbox = ttk.Checkbutton(root, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points)
+construction_points_checkbox.pack(pady=5)
+auto_construction_points.trace_add("write", on_auto_construction_points)
+
+
+criminalinput = ttk.BooleanVar()
+checkbox = ttk.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput)
+checkbox.pack(pady=5)
+
+def on_solve():
+    res = solve()
+    if res:
+        add_empty_building_row()
+
+button = ttk.Button(root, text="Solve for a system", command=on_solve)
+button.pack(pady=7)
+
+
+building_frame = ttk.Frame(root)
+building_frame.pack(padx=10, pady=5)
+
+header = [ ttk.Label(building_frame, text="Category", wraplength=150, anchor=ttk.N),
+           ttk.Label(building_frame, text="Building", wraplength=250, anchor=ttk.N),
+           ttk.Label(building_frame, text="Already built", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="Total at least", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="Total at most", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="To build", wraplength=70, anchor=ttk.N),
+           ttk.Label(building_frame, text="Total", wraplength=70, anchor=ttk.N)
+          ]
+for i, label in enumerate(header):
+    label.grid(row=0, column=i)
+
+building_input = []
+class Building_Row:
+    def __init__(self, firststation=False, result_building=None):
+        values = all_buildings.keys()
+        init_text = "Pick a facility"
+        if firststation:
+            values = all_categories["First Station"]
+            init_text = "Pick your first station"
+
+        values = data.to_printable_list(values)
+        self.name_var = ttk.StringVar(value=init_text)
+        self.valid = False
+        self.first_station = firststation
+
+        if firststation:
+            self.category_choice = ttk.Label(building_frame, text="First Station", width=15)
+        else:
+            self.category_var = ttk.StringVar(value="All" if result_building is None else "Result")
+            self.category_choice = ttk.Combobox(building_frame, textvariable=self.category_var,
+                                                width=15, state="readonly", values=list(all_categories.keys()))
+            self.category_var.trace_add("write", self.on_category_choice)
+
+        self.building_choice = ttk.Combobox(building_frame, textvariable=self.name_var, width=25, state="readonly",
+                                            values=values)
+        self.already_present_var, self.already_present_entry = self.make_int_var_and_entry()
+        self.at_least_var, self.at_least_entry = self.make_var_and_entry()
+        self.at_most_var, self.at_most_entry = self.make_var_and_entry()
+        self.to_build_var, self.to_build_entry = self.make_int_var_and_entry(modifiable=False)
+        self.total_var, self.total_entry = self.make_int_var_and_entry(modifiable=False)
+        self.delete_button = None
+        if result_building:
+            self.create_delete_button()
+
+        self.to_build_var.trace_add("write", lambda v, i, c: self.total_var.set(self.to_build_var.get() + self.already_present_var.get()))
+        self.name_var.trace_add("write", self.on_choice)
+        self.already_present_var.trace_add("write", self.on_set_already_built)
+
+        if firststation:
+            self.already_present_entry.config(state="readonly")
+
+        if result_building:
+            self.name_var.set(result_building)
+            self.valid = True
+            # self.building_choice.config(state="disabled")
+            # self.already_present_entry.config(state="readonly")
+
+    @property
+    def is_result(self):
+        return self.already_present == 0 and self.at_least_var.get() == "" and self.at_most_var.get() == ""
+    @property
+    def is_port(self):
+        building_name = data.from_printable(self.name_var.get())
+        return not self.first_station and self.valid and data.is_port(all_buildings[building_name])
+    @property
+    def building_name(self):
+        return data.from_printable(self.name_var.get())
+    @property
+    def already_present(self):
+        try:
+            return self.already_present_var.get()
+        except tkinter.TclError:
+            return 0
+
+    def pack(self, index=None):
+        if index is None:
+            index = self.index
+        else:
+            self.index = index
+        widgets = [ self.category_choice,
+                    self.building_choice, 
+                    self.already_present_entry,
+                    self.at_least_entry,
+                    self.at_most_entry,
+                    self.to_build_entry,
+                    self.total_entry ]
+        if self.delete_button:
+            widgets.append(self.delete_button)
+        for column, w in enumerate(widgets):
+            w.grid(row=index, column=column, padx=2, pady=2)
+
+    def set_build_result(self, value):
+        self.to_build_var.set(value)
+        if value > 0:
+            self.to_build_entry.config(bootstyle="success")
+
+    def remove_result(self):
+        self.to_build_var.set(0)
+        self.to_build_entry.config(bootstyle="default")
+
+    def on_category_choice(self, var, index, mode):
+        category = self.category_var.get()
+        self.building_choice.config(values=data.to_printable_list(all_categories[category]))
+        self.name_var.set("Pick a facility")
+        self.valid = False
+
+    def on_choice(self, var, index, mode):
+        if self.name_var.get() in self.building_choice.cget("values"):
+            self.valid = True
+            if self.first_station:
+                self.already_present_var.set(1)
+            update_values_from_building_input()
+            if self is building_input[-1]:
+                add_empty_building_row()
+                if self.delete_button is None and not self.first_station:
+                    self.create_delete_button()
+                    self.delete_button.grid(row=self.index, column=7)
+
+    def on_set_already_built(self, *_args):
+        update_values_from_building_input()
+
+    def delete(self):
+        self.category_choice.destroy()
+        self.building_choice.destroy()
+        self.already_present_entry.destroy()
+        self.at_least_entry.destroy()
+        self.at_most_entry.destroy()
+        self.to_build_entry.destroy()
+        self.total_entry.destroy()
+        if self.delete_button:
+            self.delete_button.destroy()
+
+    def create_delete_button(self):
+        self.delete_button = ttk.Button(building_frame, text="X",
+                                        width=1, command=self.on_delete)
+
+    def on_delete(self):
+        idx = building_input.index(self)
+        self.delete()
+        del building_input[idx]
+        update_values_from_building_input()
+        for i, row in enumerate(building_input):
+            row.pack(i+1)
+
+    def make_var_and_entry(self, modifiable=True, width=7, **kwargs):
+        variable = ttk.StringVar()
+        entry = ttk.Entry(building_frame, textvariable=variable,
+                          validate="key", validatecommand=(vcmd, "%P"),
+                          width=width, justify=ttk.RIGHT, **kwargs)
+        if modifiable:
+            entry.bind("<FocusOut>", lambda event, var=variable: on_focus_out(event, var))
+        else:
+            entry.config(state="readonly")
+        return (variable, entry)
+
+    def make_int_var_and_entry(self, modifiable=True, width=7, **kwargs):
+        variable = ttk.IntVar()
+        entry = ttk.Entry(building_frame, textvariable=variable,
+                          validate="key", validatecommand=(vcmd_positive, "%P"),
+                          width=width, justify=ttk.RIGHT, **kwargs)
+        if modifiable:
+            entry.bind("<FocusOut>", lambda event, var=variable: on_focus_out_integer(event, var))
+        else:
+            entry.config(state="readonly")
+        return (variable, entry)
+
+def add_empty_building_row(**kwargs):
+    row = Building_Row(**kwargs)
+    building_input.append(row)
+    row.pack(len(building_input) + 1)
+    return row
+
+def clear_result():
+    global building_input
+    resultlabel.config(text="")
+    for row in building_input:
+        if row.is_result:
+            row.delete()
+        else:
+            row.remove_result()
+    building_input = [ row for row in building_input if not row.is_result ]
+    for i, row in enumerate(building_input):
+        row.pack(i+1)
+
+add_empty_building_row(firststation=True)
+
+def update_values_from_building_input():
+    # For now only need to update construction points
+    if auto_construction_points.get():
+        T2points = 0
+        T3points = 0
+        number_of_ports = 0
+        for row in building_input:
+            if row.valid:
+                building = all_buildings[row.building_name]
+                nb_present = row.already_present
+
+                if row.first_station and (building.T2points != "port" and building.T2points > 0):
+                    T2points += building.T2points
+                if row.first_station and (building.T3points != "port" and building.T3points > 0):
+                    T3points += building.T3points
+                if not row.first_station:
+                    if building.T2points == "port":
+                        for _ in range(nb_present):
+                            T2points -= max(3, 1+2*number_of_ports)
+                            number_of_ports += 1
+                    else:
+                        T2points += nb_present * building.T2points
+                    if building.T3points == "port":
+                        for _ in range(nb_present):
+                            T3points -= max(6, 6*number_of_ports)
+                            number_of_ports += 1
+                    else:
+                        T3points += nb_present * building.T3points
+        T2points_variable.set(T2points)
+        T3points_variable.set(T3points)
+
+resultlabel = ttk.Label(root, text="")
+resultlabel.pack(pady=10)
 root.mainloop()
+
