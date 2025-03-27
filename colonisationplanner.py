@@ -426,8 +426,16 @@ def on_solve():
     if res:
         add_empty_building_row()
 
-button = ttk.Button(root, text="Solve for a system", command=on_solve)
-button.pack(pady=7)
+def on_clear_button():
+    clear_result()
+    add_empty_building_row()
+
+button_frame = ttk.Frame(root)
+solve_button = ttk.Button(button_frame, text="Solve for a system", command=on_solve)
+solve_button.pack(padx=5, side="left")
+clear_button = ttk.Button(button_frame, text="Clear Result", command=on_clear_button)
+clear_button.pack(padx=5, side="left")
+button_frame.pack(pady=7)
 
 
 building_frame = ttk.Frame(root)
@@ -474,7 +482,7 @@ class Building_Row:
         self.to_build_var, self.to_build_entry = self.make_int_var_and_entry(modifiable=False)
         self.total_var, self.total_entry = self.make_int_var_and_entry(modifiable=False)
         self.delete_button = None
-        if result_building:
+        if result_building or firststation:
             self.create_delete_button()
 
         self.to_build_var.trace_add("write", lambda v, i, c: self.total_var.set(self.to_build_var.get() + self.already_present_var.get()))
@@ -483,6 +491,7 @@ class Building_Row:
 
         if firststation:
             self.already_present_entry.config(state="readonly")
+            self.delete_button.config(state="disabled")
 
         if result_building:
             self.name_var.set(result_building)
@@ -492,7 +501,8 @@ class Building_Row:
 
     @property
     def is_result(self):
-        return self.already_present == 0 and self.at_least_var.get() == "" and self.at_most_var.get() == ""
+        return (not self.first_station and self.already_present == 0
+                and self.at_least_var.get() == "" and self.at_most_var.get() == "")
     @property
     def is_port(self):
         building_name = data.from_printable(self.name_var.get())
@@ -605,6 +615,15 @@ def add_empty_building_row(**kwargs):
 def clear_result():
     global building_input
     resultlabel.config(text="")
+    for var in available_slots_after_vars.values():
+        var.set(0)
+    for var in used_slots_after_vars.values():
+        var.set(0)
+    T2points_variable_after.set(0)
+    T3points_variable_after.set(0)
+    for score in all_scores:
+        resultvars[score].set(0)
+
     for row in building_input:
         if row.is_result:
             row.delete()
