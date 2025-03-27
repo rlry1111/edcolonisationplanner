@@ -356,13 +356,13 @@ for idx, (slot, slot_name) in enumerate(all_slots.items()):
 
     label = ttk.Label(slots_frame, text=slot_name)
     available = ttk.Entry(slots_frame, textvariable=available_slots_currently_vars[slot],
-                          validate="key", validatecommand=(vcmd, "%P"), width=7)
+                          validate="key", validatecommand=(vcmd, "%P"), width=7, justify=ttk.RIGHT)
     total = ttk.Entry(slots_frame, textvariable=total_slots_currently_vars[slot],
-                     width=7, state="readonly")
+                     width=7, state="readonly", justify=ttk.RIGHT)
     used_after = ttk.Entry(slots_frame, textvariable=used_slots_after_vars[slot],
-                           width=7, state="readonly")
+                           width=7, state="readonly", justify=ttk.RIGHT)
     available_after = ttk.Entry(slots_frame, textvariable=available_slots_after_vars[slot],
-                                width=7, state="readonly")
+                                width=7, state="readonly", justify=ttk.RIGHT)
 
     label.grid(row=2+idx, column=0, padx=2)
     available.grid(row=2+idx, column=1, padx=2, pady=2)
@@ -388,9 +388,9 @@ T2points_variable = ttk.IntVar()
 T2points_variable_after = ttk.IntVar()
 label = ttk.Label(construction_points_frame, text="T2 points")
 T2points_entry = ttk.Entry(construction_points_frame, textvariable=T2points_variable,
-                           validate="key", validatecommand=(vcmd, "%P"), width=10, state="readonly")
+                           validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT, state="readonly")
 T2points_entry_after = ttk.Entry(construction_points_frame, textvariable=T2points_variable_after,
-                                 width=10, state="readonly")
+                                 width=10, justify=ttk.RIGHT, state="readonly")
 label.grid(row=1, column=0, padx=2, pady=2)
 T2points_entry.grid(row=1, column=1, padx=2, pady=2)
 T2points_entry_after.grid(row=1, column=2, padx=2, pady=2)
@@ -399,9 +399,9 @@ T3points_variable = ttk.IntVar()
 T3points_variable_after = ttk.IntVar()
 label = ttk.Label(construction_points_frame, text="T3 points")
 T3points_entry = ttk.Entry(construction_points_frame, textvariable=T3points_variable,
-                           validate="key", validatecommand=(vcmd, "%P"), width=10, state="readonly")
+                           validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT, state="readonly")
 T3points_entry_after = ttk.Entry(construction_points_frame, textvariable=T3points_variable_after,
-                                 width=10, state="readonly")
+                                 width=10, justify=ttk.RIGHT, state="readonly")
 label.grid(row=2, column=0, padx=2, pady=2)
 T3points_entry.grid(row=2, column=1, padx=2, pady=2)
 T3points_entry_after.grid(row=2, column=2, padx=2, pady=2)
