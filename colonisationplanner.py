@@ -7,6 +7,7 @@ import pulp
 
 import tkinter
 import ttkbootstrap as ttk
+from ttkbootstrap.tooltip import ToolTip
 import pyglet
 
 from data import all_buildings, all_scores, all_categories
@@ -240,6 +241,7 @@ def solve():
                 port_ordering_string += f"{port_index+1}: {data.to_printable(port_name)}"
     if len(port_types) > 1:
         printresult(port_ordering_string)
+        ToolTip(resultlabel, text="If you want to force a different ordering, you can set ports as 'already built' in your favorite order.\nThe system will build facilities to provide the required construction points.\nRemember to update the number of available slots accordingly.")
 
     return True
 
