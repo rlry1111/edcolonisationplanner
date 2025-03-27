@@ -33,14 +33,20 @@ def convert_maybe(variable, default=None):
     if value != "": return int(value)
     return default
 
+def get_int_var_value(variable):
+    try:
+        return variable.get()
+    except tkinter.TclError:
+        return 0
+
 def solve():
     #requirements
     M = 10000
 
     # Get data from the Entry widgets
-    orbitalfacilityslots = orbitalfacilityslotsinput.get()
-    groundfacilityslots = groundfacilityslotsinput.get()
-    asteroidslots = asteroidslotsinput.get()
+    orbitalfacilityslots = available_slots_currently_vars["space"].get()
+    groundfacilityslots = available_slots_currently_vars["ground"].get()
+    asteroidslots = available_slots_currently_vars["asteroid"].get()
     maximize = data.from_printable(maximizeinput.get())
     initial_T2points = T2points_variable.get()
     initial_T3points = T3points_variable.get()
@@ -71,14 +77,16 @@ def solve():
         all_vars["Pirate_Base"].upBound = 0
         all_vars["Criminal_Outpost"].upBound = 0
 
-    #number of slots
+    # number of slots
+    usedslots = {}
+    for slot in ("space", "ground"):
+        usedslots[slot] = pulp.lpSum(all_vars[building_name]
+                                        for building_name, building in all_buildings.items()
+                                        if building.slot == slot)
+
     prob += all_vars["Asteroid_Base"] <= asteroidslots, "asteroid slots"
-    prob += pulp.lpSum(all_vars[building_name]
-                       for building_name, building in all_buildings.items()
-                       if building.slot == "space") <= orbitalfacilityslots, "orbital facility slots"
-    prob += pulp.lpSum(all_vars[building_name]
-                       for building_name, building in all_buildings.items()
-                       if building.slot == "ground") <= groundfacilityslots, "ground facility slots"
+    prob += usedslots["space"] <= orbitalfacilityslots, "orbital facility slots"
+    prob += usedslots["ground"] <= groundfacilityslots, "ground facility slots"
 
     # Include already present buildings as constants in all_values[...]
     for row in building_input:
@@ -153,12 +161,15 @@ def solve():
                                                        if all_buildings[name].T3points == "port") * max(6, 6*k)
                                             for k in range(max_nb_ports))
 
-    prob += pulp.lpSum( building.T2points * all_vars[name]
+    finalT2points = pulp.lpSum( building.T2points * all_vars[name]
                         for name, building in all_buildings.items()
-                        if building.T2points != "port" ) - portsT2constructionpoints + initial_T2points >= 0, "tier 2 construction points"
-    prob += pulp.lpSum( building.T3points * all_vars[name]
+                        if building.T2points != "port" ) - portsT2constructionpoints + initial_T2points
+    finalT3points = pulp.lpSum( building.T3points * all_vars[name]
                         for name, building in all_buildings.items()
-                        if building.T3points != "port" ) - portsT3constructionpoints + initial_T3points >= 0, "tier 3 construction points"
+                        if building.T3points != "port" ) - portsT3constructionpoints + initial_T3points
+
+    prob += finalT2points >= 0, "tier 2 construction points"
+    prob += finalT3points >= 0, "tier 3 construction points"
 
     #sort out dependencies for facilities
     indicator_dependency_variables = {}
@@ -207,6 +218,13 @@ def solve():
 
     for score in all_scores:
         resultvars[score].set(int(pulp.value(systemscores[score])))
+
+    T2points_variable_after.set(int(pulp.value(finalT2points)))
+    T3points_variable_after.set(int(pulp.value(finalT3points)))
+
+    available_slots_after_vars["space"].set(orbitalfacilityslots - int(pulp.value(usedslots["space"])))
+    available_slots_after_vars["ground"].set(groundfacilityslots - int(pulp.value(usedslots["ground"])))
+    available_slots_after_vars["asteroid"].set(asteroidslots - int(pulp.value(all_vars["Asteroid_Base"])))
 
     port_types = set()
     port_ordering_string = "Suggested port build order: "
@@ -272,17 +290,18 @@ frame = ttk.Frame(root)
 frame.pack(pady=5)
 label = ttk.Label(frame, text="Select what you are trying to optimise:")
 label.pack(side="left")
-dropdown = ttk.OptionMenu(frame, maximizeinput, *data.to_printable_list(all_scores))
+dropdown = ttk.OptionMenu(frame, maximizeinput, "Choose", *data.to_printable_list(all_scores))
 dropdown.pack(side="left")
 
-minframes = {}
 minvars = {}
 maxvars = {}
 resultvars = {}
 
-constraint_frame = ttk.Frame(root)
-constraint_frame.pack(padx=10, pady=5)
-ttk.Label(constraint_frame, text="System Scores").grid(column=0, columnspan=3, row=0)
+mixed_frame = ttk.Frame(root)
+mixed_frame.pack()
+
+constraint_frame = ttk.LabelFrame(mixed_frame, text="Sytem Stats", padding=2)
+constraint_frame.pack(padx=10, pady=5, side="left", fill="y")
 ttk.Label(constraint_frame, text="min. value").grid(column=1, row=1)
 ttk.Label(constraint_frame, text="max. value").grid(column=2, row=1)
 ttk.Label(constraint_frame, text="solution value").grid(column=3, row=1)
@@ -294,65 +313,99 @@ for i, name in enumerate(all_scores):
     display_name = data.to_printable(name)
     label = ttk.Label(constraint_frame, text=display_name)
     label.grid(column=0, row=2+i, pady=2, padx=2)
-    entry_min = ttk.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT)
-    entry_max = ttk.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=10, justify=ttk.RIGHT)
+    entry_min = ttk.Entry(constraint_frame, textvariable=minvars[name], validate="key", validatecommand=(vcmd, "%P"), width=7, justify=ttk.RIGHT)
+    entry_max = ttk.Entry(constraint_frame, textvariable=maxvars[name], validate="key", validatecommand=(vcmd, "%P"), width=7, justify=ttk.RIGHT)
     entry_min.grid(column=1, row=2+i, pady=2, padx=2)
     entry_max.grid(column=2, row=2+i, pady=2, padx=2)
     entry_min.bind("<FocusOut>", lambda event, var=minvars[name]: on_focus_out(event, var))
     entry_max.bind("<FocusOut>", lambda event, var=maxvars[name]: on_focus_out(event, var))
 
-    result = ttk.Entry(constraint_frame, textvariable=resultvars[name], width=10, justify=ttk.RIGHT)
+    result = ttk.Entry(constraint_frame, textvariable=resultvars[name], width=7, justify=ttk.RIGHT)
     result.grid(column=3, row=2+i, padx=5, pady=2)
     result.config(state="readonly")
     set_style_if_negative(resultvars[name], result)
 
-orbitalfacilityslotsinput = ttk.IntVar()
-groundfacilityslotsinput = ttk.IntVar()
-asteroidslotsinput = ttk.IntVar()
-frame20 = ttk.Frame(root)
-frame20.pack(pady=5)
-label = ttk.Label(frame20, text="Number of available orbital facility slots (excluding already built facilities):")
-label.pack(side="left")
-entry = ttk.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
-entry.pack(side="left")
-entry.bind("<FocusOut>", lambda event, var=orbitalfacilityslotsinput: on_focus_out(event, var))
-frame21 = ttk.Frame(root)
-frame21.pack(pady=5)
-label = ttk.Label(frame21, text="Number of available ground facility slots (excluding already built facilities):")
-label.pack(side="left")
-entry = ttk.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
-entry.pack(side="left")
-entry.bind("<FocusOut>", lambda event, var=groundfacilityslotsinput: on_focus_out(event, var))
-frame22 = ttk.Frame(root)
-frame22.pack(pady=5)
-label = ttk.Label(frame22, text="Number of available slots for asteroid bases (excluding already built asteroid bases):")
-label.pack(side="left")
-entry = ttk.Entry(frame22, textvariable=asteroidslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
-entry.pack(side="left")
-entry.bind("<FocusOut>", lambda event, var=asteroidslotsinput: on_focus_out(event, var))
+
+right_frame = ttk.Frame(mixed_frame)
+right_frame.pack(side="left", expand=True, fill="both")
+slots_frame = ttk.LabelFrame(right_frame, text="System slots", padding=2)
+slots_frame.pack(padx=10, pady=5, side="top", fill="y")
+ttk.Label(slots_frame, text="currently").grid(column=1, row=0, columnspan=2)
+ttk.Label(slots_frame, text="in solution").grid(column=3, row=0, columnspan=2)
+ttk.Label(slots_frame, text="available").grid(column=1, row=1)
+ttk.Label(slots_frame, text="total").grid(column=2, row=1)
+ttk.Label(slots_frame, text="used").grid(column=3, row=1)
+ttk.Label(slots_frame, text="available").grid(column=4, row=1)
+
+
+all_slots = {"space": "Orbital", "ground": "Ground", "asteroid": "Asteroid"}
+available_slots_currently_vars = {}
+total_slots_currently_vars = {}
+available_slots_after_vars = {}
+used_slots_after_vars = {}
+
+for idx, (slot, slot_name) in enumerate(all_slots.items()):
+
+    available_slots_currently_vars[slot] = ttk.IntVar()
+    total_slots_currently_vars[slot] = ttk.IntVar()
+    available_slots_after_vars[slot] = ttk.IntVar()
+    used_slots_after_vars[slot] = ttk.IntVar()
+
+    label = ttk.Label(slots_frame, text=slot_name)
+    available = ttk.Entry(slots_frame, textvariable=available_slots_currently_vars[slot],
+                          validate="key", validatecommand=(vcmd, "%P"), width=7)
+    total = ttk.Entry(slots_frame, textvariable=total_slots_currently_vars[slot],
+                     width=7, state="readonly")
+    used_after = ttk.Entry(slots_frame, textvariable=used_slots_after_vars[slot],
+                           width=7, state="readonly")
+    available_after = ttk.Entry(slots_frame, textvariable=available_slots_after_vars[slot],
+                                width=7, state="readonly")
+
+    label.grid(row=2+idx, column=0, padx=2)
+    available.grid(row=2+idx, column=1, padx=2, pady=2)
+    total.grid(row=2+idx, column=2, padx=2, pady=2)
+    used_after.grid(row=2+idx, column=3, padx=2, pady=2)
+    available_after.grid(row=2+idx, column=4, padx=2, pady=2)
+
+    available.bind("<FocusOut>", lambda event, var=available_slots_currently_vars[slot]: on_focus_out(event, var))
+    available.config(bootstyle="primary")
+    available_slots_after_vars[slot].trace_add("write", lambda *args, slot=slot: used_slots_after_vars[slot].set(total_slots_currently_vars[slot].get() - available_slots_after_vars[slot].get()))
+
+criminalinput = ttk.BooleanVar()
+checkbox = ttk.Checkbutton(slots_frame, text="Allow contraband stations (pirate base, criminal outpost)", variable=criminalinput)
+checkbox.grid(row=2+len(all_slots), column=0, columnspan=5, padx=10, pady=10)
+
+
+construction_points_frame = ttk.LabelFrame(right_frame, text="Construction points", padding=2)
+construction_points_frame.pack(side="top", padx=10, pady=5, fill="both")
+ttk.Label(construction_points_frame, text="currently").grid(row=0, column=1)
+ttk.Label(construction_points_frame, text="in solution").grid(row=0, column=2)
 
 T2points_variable = ttk.IntVar()
-frame23 = ttk.Frame(root)
-frame23.pack(pady=5)
-label = ttk.Label(frame23, text="Number of available T2 construction points:")
-label.pack(side="left")
-T2points_entry = ttk.Entry(frame23, textvariable=T2points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
-T2points_entry.pack(side="left")
+T2points_variable_after = ttk.IntVar()
+label = ttk.Label(construction_points_frame, text="T2 points")
+T2points_entry = ttk.Entry(construction_points_frame, textvariable=T2points_variable,
+                           validate="key", validatecommand=(vcmd, "%P"), width=10, state="readonly")
+T2points_entry_after = ttk.Entry(construction_points_frame, textvariable=T2points_variable_after,
+                                 width=10, state="readonly")
+label.grid(row=1, column=0, padx=2, pady=2)
+T2points_entry.grid(row=1, column=1, padx=2, pady=2)
+T2points_entry_after.grid(row=1, column=2, padx=2, pady=2)
 
 T3points_variable = ttk.IntVar()
-frame24 = ttk.Frame(root)
-frame24.pack(pady=5)
-label = ttk.Label(frame24, text="Number of available T3 construction points:")
-label.pack(side="left")
-T3points_entry = ttk.Entry(frame24, textvariable=T3points_variable, validate="key", validatecommand=(vcmd, "%P"),width=10)
-T3points_entry.pack(side="left")
-
-T2points_entry.config(state="readonly")
-T3points_entry.config(state="readonly")
+T3points_variable_after = ttk.IntVar()
+label = ttk.Label(construction_points_frame, text="T3 points")
+T3points_entry = ttk.Entry(construction_points_frame, textvariable=T3points_variable,
+                           validate="key", validatecommand=(vcmd, "%P"), width=10, state="readonly")
+T3points_entry_after = ttk.Entry(construction_points_frame, textvariable=T3points_variable_after,
+                                 width=10, state="readonly")
+label.grid(row=2, column=0, padx=2, pady=2)
+T3points_entry.grid(row=2, column=1, padx=2, pady=2)
+T3points_entry_after.grid(row=2, column=2, padx=2, pady=2)
 
 def on_auto_construction_points(*args):
-    update_values_from_building_input()
     if auto_construction_points.get():
+        update_values_from_building_input()
         T2points_entry.config(state="readonly")
         T3points_entry.config(state="readonly")
     else:
@@ -360,14 +413,10 @@ def on_auto_construction_points(*args):
         T3points_entry.config(state=ttk.NORMAL)
 
 auto_construction_points = ttk.BooleanVar(value=True)
-construction_points_checkbox = ttk.Checkbutton(root, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points)
-construction_points_checkbox.pack(pady=5)
+construction_points_checkbox = ttk.Checkbutton(construction_points_frame, text="Compute automatically from already built facilities", variable=auto_construction_points)
+construction_points_checkbox.grid(row=3, column=0, columnspan=3, pady=5, padx=10)
 auto_construction_points.trace_add("write", on_auto_construction_points)
 
-
-criminalinput = ttk.BooleanVar()
-checkbox = ttk.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput)
-checkbox.pack(pady=5)
 
 def on_solve():
     res = solve()
@@ -450,10 +499,7 @@ class Building_Row:
         return data.from_printable(self.name_var.get())
     @property
     def already_present(self):
-        try:
-            return self.already_present_var.get()
-        except tkinter.TclError:
-            return 0
+        return get_int_var_value(self.already_present_var)
 
     def pack(self, index=None):
         if index is None:
@@ -515,7 +561,7 @@ class Building_Row:
 
     def create_delete_button(self):
         self.delete_button = ttk.Button(building_frame, text="X",
-                                        width=1, command=self.on_delete)
+                                        width=1, command=self.on_delete, bootstyle=("outline", "secondary"))
 
     def on_delete(self):
         idx = building_input.index(self)
@@ -569,34 +615,46 @@ add_empty_building_row(firststation=True)
 
 def update_values_from_building_input():
     # For now only need to update construction points
-    if auto_construction_points.get():
-        T2points = 0
-        T3points = 0
-        number_of_ports = 0
-        for row in building_input:
-            if row.valid:
-                building = all_buildings[row.building_name]
-                nb_present = row.already_present
+    T2points = 0
+    T3points = 0
+    number_of_ports = 0
+    slots = {name: 0 for name in available_slots_currently_vars.keys() }
+    for row in building_input:
+        if row.valid:
+            building = all_buildings[row.building_name]
+            nb_present = row.already_present
 
-                if row.first_station and (building.T2points != "port" and building.T2points > 0):
-                    T2points += building.T2points
-                if row.first_station and (building.T3points != "port" and building.T3points > 0):
-                    T3points += building.T3points
-                if not row.first_station:
-                    if building.T2points == "port":
-                        for _ in range(nb_present):
-                            T2points -= max(3, 1+2*number_of_ports)
-                            number_of_ports += 1
-                    else:
-                        T2points += nb_present * building.T2points
-                    if building.T3points == "port":
-                        for _ in range(nb_present):
-                            T3points -= max(6, 6*number_of_ports)
-                            number_of_ports += 1
-                    else:
-                        T3points += nb_present * building.T3points
+            slots[building.slot] += nb_present
+            if row.building_name == "Asteroid_Base":
+                slots["asteroid"] += nb_present
+
+            if row.first_station and (building.T2points != "port" and building.T2points > 0):
+                T2points += building.T2points
+            if row.first_station and (building.T3points != "port" and building.T3points > 0):
+                T3points += building.T3points
+            if not row.first_station:
+                if building.T2points == "port":
+                    for _ in range(nb_present):
+                        T2points -= max(3, 1+2*number_of_ports)
+                        number_of_ports += 1
+                else:
+                    T2points += nb_present * building.T2points
+                if building.T3points == "port":
+                    for _ in range(nb_present):
+                        T3points -= max(6, 6*number_of_ports)
+                        number_of_ports += 1
+                else:
+                    T3points += nb_present * building.T3points
+
+    for slot, nb_used in slots.items():
+        avail = get_int_var_value(available_slots_currently_vars[slot])
+        total_slots_currently_vars[slot].set(avail + nb_used)
+    if auto_construction_points.get():
         T2points_variable.set(T2points)
         T3points_variable.set(T3points)
+
+for var in available_slots_currently_vars.values():
+        var.trace_add("write", lambda *args: update_values_from_building_input())
 
 resultlabel = ttk.Label(root, text="")
 resultlabel.pack(pady=10)
