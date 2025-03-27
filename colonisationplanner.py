@@ -330,6 +330,27 @@ for i, name in enumerate(all_scores):
     result.config(state="readonly")
     set_style_if_negative(resultvars[name], result)
 
+all_slots = {"space": "Orbital", "ground": "Ground", "asteroid": "Asteroid"}
+available_slots_currently_vars = {}
+total_slots_currently_vars = {}
+available_slots_currently_entries = {}
+total_slots_currently_entries = {}
+available_slots_after_vars = {}
+used_slots_after_vars = {}
+slot_behavior = "fix_available"
+
+def on_toggle_slot_input(button_name):
+    global slot_behavior
+    slot_behavior = button_name
+    print("Set button behavior to", slot_behavior)
+    if button_name == "fix_available":
+        for slot in all_slots.keys():
+            available_slots_currently_entries[slot].config(state="normal")
+            total_slots_currently_entries[slot].config(state="readonly")
+    else:
+        for slot in all_slots.keys():
+            available_slots_currently_entries[slot].config(state="readonly")
+            total_slots_currently_entries[slot].config(state="normal")
 
 right_frame = ttk.Frame(mixed_frame)
 right_frame.pack(side="left", expand=True, fill="both")
@@ -337,17 +358,14 @@ slots_frame = ttk.LabelFrame(right_frame, text="System slots", padding=2)
 slots_frame.pack(padx=10, pady=5, side="top", fill="y")
 ttk.Label(slots_frame, text="currently").grid(column=1, row=0, columnspan=2)
 ttk.Label(slots_frame, text="in solution").grid(column=3, row=0, columnspan=2)
-ttk.Label(slots_frame, text="available").grid(column=1, row=1)
-ttk.Label(slots_frame, text="total").grid(column=2, row=1)
+slots_available_button = ttk.Button(slots_frame, text="available", bootstyle="link", command=lambda: on_toggle_slot_input("fix_available"))
+slots_available_button.grid(column=1, row=1)
+slots_total_button = ttk.Button(slots_frame, text="total", bootstyle="link", command=lambda: on_toggle_slot_input("fix_total"))
+slots_total_button.grid(column=2, row=1)
+ToolTip(slots_available_button, "Click to toggle between providing the available or total number of slots")
+ToolTip(slots_total_button, "Click to toggle between providing the available or total number of slots")
 ttk.Label(slots_frame, text="used").grid(column=3, row=1)
 ttk.Label(slots_frame, text="available").grid(column=4, row=1)
-
-
-all_slots = {"space": "Orbital", "ground": "Ground", "asteroid": "Asteroid"}
-available_slots_currently_vars = {}
-total_slots_currently_vars = {}
-available_slots_after_vars = {}
-used_slots_after_vars = {}
 
 for idx, (slot, slot_name) in enumerate(all_slots.items()):
 
@@ -375,6 +393,8 @@ for idx, (slot, slot_name) in enumerate(all_slots.items()):
     available.bind("<FocusOut>", lambda event, var=available_slots_currently_vars[slot]: on_focus_out(event, var))
     available.config(bootstyle="primary")
     available_slots_after_vars[slot].trace_add("write", lambda *args, slot=slot: used_slots_after_vars[slot].set(total_slots_currently_vars[slot].get() - available_slots_after_vars[slot].get()))
+    available_slots_currently_entries[slot] = available
+    total_slots_currently_entries[slot] = total
 
 criminalinput = ttk.BooleanVar()
 checkbox = ttk.Checkbutton(slots_frame, text="Allow contraband stations (pirate base, criminal outpost)", variable=criminalinput)
@@ -670,9 +690,15 @@ def update_values_from_building_input():
                 else:
                     T3points += nb_present * building.T3points
 
+    print("Slot behavior is", slot_behavior)
     for slot, nb_used in slots.items():
-        avail = get_int_var_value(available_slots_currently_vars[slot])
-        total_slots_currently_vars[slot].set(avail + nb_used)
+        if slot_behavior == "fix_available":
+            avail = get_int_var_value(available_slots_currently_vars[slot])
+            total_slots_currently_vars[slot].set(avail + nb_used)
+        else:
+            total = get_int_var_value(total_slots_currently_vars[slot])
+            available_slots_currently_vars[slot].set(total - nb_used)
+
     if auto_construction_points.get():
         T2points_variable.set(T2points)
         T3points_variable.set(T3points)
