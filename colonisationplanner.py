@@ -278,6 +278,29 @@ def set_style_if_negative(variable, entry, style1="danger", style2="success"):
             entry.config(bootstyle=style2)
     variable.trace_add("write", callback)
 
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.canvas = tkinter.Canvas(self, borderwidth=0)
+        self.vscrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.vscrollbar.set)
+        self.vscrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        container.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _on_frame_configure(self, event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfig(self.window_id, width=event.width)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
 # Main window
 root = ttk.Window(themename="darkly")
 vcmd = root.register(validate_input)
@@ -289,9 +312,11 @@ style.map('success.TEntry', fieldbackground=[])
 style.map('TEntry', fieldbackground=[])
 root.title("Elite Dangerous colonisation planner")
 root.geometry("1000x1000")
+scroll_frame = ScrollableFrame(root)
+scroll_frame.pack(fill="both", expand=True)
 
 maximizeinput = ttk.StringVar()
-frame = ttk.Frame(root)
+frame = ttk.Frame(scroll_frame.scrollable_frame)
 frame.pack(pady=5)
 label = ttk.Label(frame, text="Select what you are trying to optimise:")
 label.pack(side="left")
@@ -302,7 +327,7 @@ minvars = {}
 maxvars = {}
 resultvars = {}
 
-mixed_frame = ttk.Frame(root)
+mixed_frame = ttk.Frame(scroll_frame.scrollable_frame)
 mixed_frame.pack()
 
 constraint_frame = ttk.LabelFrame(mixed_frame, text="Sytem Stats", padding=2)
@@ -342,7 +367,6 @@ slot_behavior = "fix_available"
 def on_toggle_slot_input(button_name):
     global slot_behavior
     slot_behavior = button_name
-    print("Set button behavior to", slot_behavior)
     if button_name == "fix_available":
         for slot in all_slots.keys():
             available_slots_currently_entries[slot].config(state="normal")
@@ -452,7 +476,7 @@ def on_clear_button():
     clear_result()
     add_empty_building_row()
 
-button_frame = ttk.Frame(root)
+button_frame = ttk.Frame(scroll_frame.scrollable_frame)
 solve_button = ttk.Button(button_frame, text="Solve for a system", command=on_solve)
 solve_button.pack(padx=5, side="left")
 clear_button = ttk.Button(button_frame, text="Clear Result", command=on_clear_button)
@@ -460,7 +484,7 @@ clear_button.pack(padx=5, side="left")
 button_frame.pack(pady=7)
 
 
-building_frame = ttk.Frame(root)
+building_frame = ttk.Frame(scroll_frame.scrollable_frame)
 building_frame.pack(padx=10, pady=5)
 
 header = [ ttk.Label(building_frame, text="Category", wraplength=150, anchor=ttk.N),
@@ -690,7 +714,6 @@ def update_values_from_building_input():
                 else:
                     T3points += nb_present * building.T3points
 
-    print("Slot behavior is", slot_behavior)
     for slot, nb_used in slots.items():
         if slot_behavior == "fix_available":
             avail = get_int_var_value(available_slots_currently_vars[slot])
@@ -706,7 +729,7 @@ def update_values_from_building_input():
 for var in available_slots_currently_vars.values():
         var.trace_add("write", lambda *args: update_values_from_building_input())
 
-resultlabel = ttk.Label(root, text="")
+resultlabel = ttk.Label(scroll_frame.scrollable_frame, text="")
 resultlabel.pack(pady=10)
 root.mainloop()
 
