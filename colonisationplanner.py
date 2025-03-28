@@ -255,6 +255,29 @@ def set_style_if_negative(variable, entry, style1="danger", style2="success"):
             entry.config(bootstyle=style2)
     variable.trace_add("write", callback)
 
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.canvas = tkinter.Canvas(self, borderwidth=0)
+        self.vscrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.vscrollbar.set)
+        self.vscrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        container.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _on_frame_configure(self, event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfig(self.window_id, width=event.width)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
 # Main window
 root = ttk.Window(themename="darkly")
 vcmd = root.register(validate_input)
@@ -267,8 +290,10 @@ style.map('TEntry', fieldbackground=[])
 
 root.title("Elite Dangerous colonisation planner")
 root.geometry("1000x1000")
+scroll_frame = ScrollableFrame(root)
+scroll_frame.pack(fill="both", expand=True)
 maximizeinput = ttk.StringVar()
-frame = ttk.Frame(root)
+frame = ttk.Frame(scroll_frame.scrollable_frame)
 frame.pack(pady=5)
 label = ttk.Label(frame, text="Select what you are trying to optimise:")
 label.pack(side="left")
@@ -280,7 +305,7 @@ minvars = {}
 maxvars = {}
 resultvars = {}
 
-constraint_frame = ttk.Frame(root)
+constraint_frame = ttk.Frame(scroll_frame.scrollable_frame)
 constraint_frame.pack(padx=10, pady=5)
 ttk.Label(constraint_frame, text="System Scores").grid(column=0, columnspan=3, row=0)
 ttk.Label(constraint_frame, text="min. value").grid(column=1, row=1)
@@ -309,21 +334,21 @@ for i, name in enumerate(all_scores):
 orbitalfacilityslotsinput = ttk.IntVar()
 groundfacilityslotsinput = ttk.IntVar()
 asteroidslotsinput = ttk.IntVar()
-frame20 = ttk.Frame(root)
+frame20 = ttk.Frame(scroll_frame.scrollable_frame)
 frame20.pack(pady=5)
 label = ttk.Label(frame20, text="Number of available orbital facility slots (excluding already built facilities):")
 label.pack(side="left")
 entry = ttk.Entry(frame20, textvariable=orbitalfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=orbitalfacilityslotsinput: on_focus_out(event, var))
-frame21 = ttk.Frame(root)
+frame21 = ttk.Frame(scroll_frame.scrollable_frame)
 frame21.pack(pady=5)
 label = ttk.Label(frame21, text="Number of available ground facility slots (excluding already built facilities):")
 label.pack(side="left")
 entry = ttk.Entry(frame21, textvariable=groundfacilityslotsinput, validate="key", validatecommand=(vcmd, "%P"),width=10)
 entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=groundfacilityslotsinput: on_focus_out(event, var))
-frame22 = ttk.Frame(root)
+frame22 = ttk.Frame(scroll_frame.scrollable_frame)
 frame22.pack(pady=5)
 label = ttk.Label(frame22, text="Number of available slots for asteroid bases (excluding already built asteroid bases):")
 label.pack(side="left")
@@ -332,7 +357,7 @@ entry.pack(side="left")
 entry.bind("<FocusOut>", lambda event, var=asteroidslotsinput: on_focus_out(event, var))
 
 T2points_variable = ttk.IntVar()
-frame23 = ttk.Frame(root)
+frame23 = ttk.Frame(scroll_frame.scrollable_frame)
 frame23.pack(pady=5)
 label = ttk.Label(frame23, text="Number of available T2 construction points:")
 label.pack(side="left")
@@ -340,7 +365,7 @@ T2points_entry = ttk.Entry(frame23, textvariable=T2points_variable, validate="ke
 T2points_entry.pack(side="left")
 
 T3points_variable = ttk.IntVar()
-frame24 = ttk.Frame(root)
+frame24 = ttk.Frame(scroll_frame.scrollable_frame)
 frame24.pack(pady=5)
 label = ttk.Label(frame24, text="Number of available T3 construction points:")
 label.pack(side="left")
@@ -360,13 +385,13 @@ def on_auto_construction_points(*args):
         T3points_entry.config(state=ttk.NORMAL)
 
 auto_construction_points = ttk.BooleanVar(value=True)
-construction_points_checkbox = ttk.Checkbutton(root, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points)
+construction_points_checkbox = ttk.Checkbutton(scroll_frame.scrollable_frame, text="Automatically compute T2 / T3 construction points  from already built facilities", variable=auto_construction_points)
 construction_points_checkbox.pack(pady=5)
 auto_construction_points.trace_add("write", on_auto_construction_points)
 
 
 criminalinput = ttk.BooleanVar()
-checkbox = ttk.Checkbutton(root, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput)
+checkbox = ttk.Checkbutton(scroll_frame.scrollable_frame, text="Are you okay with contraband stations being built in your system? (pirate base, criminal outpost)", variable=criminalinput)
 checkbox.pack(pady=5)
 
 def on_solve():
@@ -374,11 +399,11 @@ def on_solve():
     if res:
         add_empty_building_row()
 
-button = ttk.Button(root, text="Solve for a system", command=on_solve)
+button = ttk.Button(scroll_frame.scrollable_frame, text="Solve for a system", command=on_solve)
 button.pack(pady=7)
 
 
-building_frame = ttk.Frame(root)
+building_frame = ttk.Frame(scroll_frame.scrollable_frame)
 building_frame.pack(padx=10, pady=5)
 
 header = [ ttk.Label(building_frame, text="Category", wraplength=150, anchor=ttk.N),
@@ -598,7 +623,7 @@ def update_values_from_building_input():
         T2points_variable.set(T2points)
         T3points_variable.set(T3points)
 
-resultlabel = ttk.Label(root, text="")
+resultlabel = ttk.Label(scroll_frame.scrollable_frame, text="")
 resultlabel.pack(pady=10)
 root.mainloop()
 
