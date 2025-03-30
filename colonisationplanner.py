@@ -361,6 +361,10 @@ class ScrollableFrame(ttk.Frame):
         container.unbind_class("TCombobox", "<ButtonPress-4>")
         container.unbind_class("TCombobox", "<ButtonPress-5>")
 
+    def should_scroll(self):
+        canvas_height = self.canvas.winfo_height()
+        rows_height = self.canvas.bbox("all")[3]
+        return rows_height > canvas_height # only scroll if the rows overflow the frame
 
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -369,13 +373,17 @@ class ScrollableFrame(ttk.Frame):
         self.canvas.itemconfig(self.window_id, width=event.width)
 
     def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        if self.should_scroll():
+            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def _on_up(self, event):
-        self.canvas.yview_scroll(-1, "units")
+        if self.should_scroll():
+            self.canvas.yview_scroll(-1, "units")
 
     def _on_down(self, event):
-        self.canvas.yview_scroll(1, "units")
+        if self.should_scroll():
+            self.canvas.yview_scroll(1, "units")
+
 
 # Main window
 root = ttk.Window(themename="darkly")
