@@ -385,6 +385,17 @@ root.geometry("1000x1000")
 scroll_frame = ScrollableFrame(root)
 scroll_frame.pack(fill="both", expand=True)
 
+def on_dark_mode_change(*args):
+    if dark_mode_var.get():
+        root.style.theme_use("darkly")
+    else:
+        root.style.theme_use("litera")
+
+dark_mode_var = ttk.BooleanVar(value=True)
+dark_mode_button = ttk.Checkbutton(scroll_frame.scrollable_frame, text="Dark mode", variable=dark_mode_var, bootstyle="round-toggle")
+dark_mode_var.trace_add("write", on_dark_mode_change)
+dark_mode_button.place(x=5, y=5)
+
 maximizeinput = ttk.StringVar()
 frame = ttk.Frame(scroll_frame.scrollable_frame)
 frame.pack(pady=5)
