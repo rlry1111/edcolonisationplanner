@@ -12,7 +12,6 @@ import pyglet
 
 from data import all_buildings, all_scores, all_categories
 import data
-
 #TODO
 #   Let the code select a starting system
 #   Add port economy (once Fdev fixes it)
@@ -40,10 +39,13 @@ def get_int_var_value(variable):
     except tkinter.TclError:
         return 0
 
+choosefirststation = False
 def solve():
     #requirements
     M = 10000
-
+    if building_input[0].name_var.get() == "Pick your first station":
+        printresult("Error: pick your first station")
+        return None
     # Get data from the Entry widgets
     orbitalfacilityslots = available_slots_currently_vars["space"].get()
     groundfacilityslots = available_slots_currently_vars["ground"].get()
@@ -60,9 +62,10 @@ def solve():
     prob = pulp.LpProblem("optimal_system_colonization_layout", direction)
 
     #create all the variables for each of the facilities
-    all_vars = {}   # for each building name, the variables that decide how many will be BUILT
+    all_vars = {} # for each building name, the variables that decide how many will be BUILT
+    first_station = {} # binary values for first station
     all_values = {} # for each building name, the expressions that give how many will be in TOTAL (=all_var + already_present)
-    port_vars = {}  # for ports: for each port name, kth variable is 1 if the k-th port built is of this type
+    port_vars = {} # for ports: for each port name, kth variable is 1 if the k-th port built is of this type
     for n, b in all_buildings.items():
         if not data.is_port(b):
             all_vars[n] = pulp.LpVariable(n, cat='Integer', lowBound=0)
@@ -73,10 +76,21 @@ def solve():
             port_vars[n] = [ pulp.LpVariable(f"{n}_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
             all_vars[n] = pulp.lpSum(port_vars[n])
         all_values[n] = all_vars[n]
-
+    if choosefirststation:
+        for i in all_categories["First Station"]:
+            first_station.update({i: pulp.LpVariable("first station binary variable for " + i, cat="Binary")})
+        if not cbc.get():
+            prob += first_station["Coriolis"] == 0, "cannot build coriolis"
+        if not cbab.get():
+            prob += first_station["Asteroid_Base"] == 0, "cannot build asteroid base"
+        if not cbo.get():
+            prob += first_station["Orbis_or_Ocellus"] == 0, "cannot build orbis/ocellus"
+        prob += pulp.lpSum(first_station.values()) == 1, "only one first station"
     if not criminalinput.get():
         all_vars["Pirate_Base"].upBound = 0
         all_vars["Criminal_Outpost"].upBound = 0
+        if "Criminal_Outpost" in first_station:
+            first_station["Criminal_Outpost"].upBound = 0
 
     # number of slots
     usedslots = {}
@@ -85,6 +99,7 @@ def solve():
                                         for building_name, building in all_buildings.items()
                                         if building.slot == slot)
 
+    #number of slots
     prob += all_vars["Asteroid_Base"] <= asteroidslots, "asteroid slots"
     prob += usedslots["space"] <= orbitalfacilityslots, "orbital facility slots"
     prob += usedslots["ground"] <= groundfacilityslots, "ground facility slots"
@@ -96,11 +111,12 @@ def solve():
         building_name = row.building_name
         already_present = row.already_present
         if already_present:
-            all_values[building_name] = all_values[building_name] + already_present
+            if building_name != 'Let_the_program_choose_for_me':
+                all_values[building_name] = all_values[building_name] + already_present
 
-            if building_name in ["Pirate_Base", "Criminal_Outpost"] and not criminalinput.get():
-                resultlabel.config(text="Error: criminal outpost or pirate base already present, but you do not want criminal outposts to be built")
-                return False
+                if building_name in ["Pirate_Base", "Criminal_Outpost"] and not criminalinput.get():
+                    resultlabel.config(text="Error: criminal outpost or pirate base already present, but you do not want criminal outposts to be built")
+                    return False
 
     # Already present ports can not be built
     for port_var in port_vars.values():
@@ -132,11 +148,15 @@ def solve():
     for score in data.base_scores:
         if score != "construction_cost":
             systemscores[score] = pulp.lpSum(getattr(building, score) * all_values[building_name]
-                                             for building_name, building in all_buildings.items())
+                                             for building_name, building in all_buildings.items()) + pulp.lpSum(
+                                    getattr(building, score) * (lambda x: first_station[x] if x in first_station else 0)(building_name)
+                                    for building_name, building in all_buildings.items())
         else:
             # Do not count already present buildings for construction cost
             systemscores[score] = pulp.lpSum(getattr(building, score) * all_vars[building_name]
-                                             for building_name, building in all_buildings.items())
+                                             for building_name, building in all_buildings.items()) + pulp.lpSum(
+                                    getattr(building, score) * (lambda x: first_station[x] if x in first_station else 0)(building_name)
+                                    for building_name, building in all_buildings.items())
     for score in data.compound_scores:
         systemscores[score] = data.compute_compound_score(score, systemscores)
 
@@ -144,7 +164,7 @@ def solve():
     if maximize in systemscores:
         prob += systemscores[maximize]
     else:
-        resultlabel.config(text=f"Error: One or more inputs are blank: unknown objective '{maximize}'")
+        resultlabel.config(text=f"Error: One or more inputs are blank: select an objective to maximize")
         return False
 
     # Constraints on minimum and maximum scores
@@ -243,6 +263,14 @@ def solve():
         printresult(port_ordering_string)
         ToolTip(resultlabel, text="If you want to force a different ordering, you can set ports as 'already built' in your favorite order.\nThe system will build facilities to provide the required construction points.\nRemember to update the number of available slots accordingly.")
 
+    firststationname = ""
+    for i in first_station:
+        if pulp.value(first_station[i]) == 1:
+            firststationname = i
+    if choosefirststation:
+        building_input[0].name_var.set(data.to_printable(firststationname))
+    building_input[0].on_choice(1,1,1)
+    remove_widgets_from_frame(root, widget_names=["remove1", "remove2", "remove3"])
     return True
 
 def printresult(text):
@@ -277,6 +305,27 @@ def set_style_if_negative(variable, entry, style1="danger", style2="success"):
         else:
             entry.config(bootstyle=style2)
     variable.trace_add("write", callback)
+
+def get_widget_hierarchy(widget):
+    #Recursively retrieves all widgets and their parents in a nested dictionary
+    #Mainly for debugging
+    hierarchy = {}
+    for child in widget.winfo_children():
+        hierarchy[child] = get_widget_hierarchy(child)
+    return hierarchy
+
+def print_hierarchy(hierarchy, level=0):
+    #Prints the widget hierarchy in a readable format
+    #Mainly for debugging
+    for widget, children in hierarchy.items():
+        print("  " * level + f"{widget.winfo_class()} - {widget.winfo_name()}")
+        print_hierarchy(children, level + 1)
+
+def remove_widgets_from_frame(frame, widget_classes=None, widget_names=None):
+    for child in frame.winfo_children():
+        if (widget_classes and child.winfo_class() in widget_classes) or \
+           (widget_names and child.winfo_name() in widget_names):
+            child.destroy()
 
 class ScrollableFrame(ttk.Frame):
     def __init__(self, container, *args, **kwargs):
@@ -328,7 +377,7 @@ frame = ttk.Frame(scroll_frame.scrollable_frame)
 frame.pack(pady=5)
 label = ttk.Label(frame, text="Select what you are trying to optimise:")
 label.pack(side="left")
-dropdown = ttk.OptionMenu(frame, maximizeinput, "Choose", *data.to_printable_list(all_scores))
+dropdown = tkinter.OptionMenu(frame, maximizeinput, "Choose", *data.to_printable_list(all_scores))
 dropdown.pack(side="left")
 
 minvars = {}
@@ -503,6 +552,10 @@ header = [ ttk.Label(building_frame, text="Category", wraplength=150, anchor=ttk
            ttk.Label(building_frame, text="To build", wraplength=70, anchor=ttk.N),
            ttk.Label(building_frame, text="Total", wraplength=70, anchor=ttk.N)
           ]
+cbclabel = ttk.Label(building_frame, text="", wraplength=150, anchor=ttk.N)
+cbablabel = ttk.Label(building_frame, text="", wraplength=150, anchor=ttk.N)
+cbolabel = ttk.Label(building_frame, text="", wraplength=150, anchor=ttk.N)
+header += [cbclabel, cbablabel, cbolabel]
 for i, label in enumerate(header):
     label.grid(row=0, column=i)
 
@@ -519,9 +572,9 @@ class Building_Row:
         self.name_var = ttk.StringVar(value=init_text)
         self.valid = False
         self.first_station = firststation
-
         if firststation:
             self.category_choice = ttk.Label(building_frame, text="First Station", width=15)
+            values.append("Let the program choose for me")
         else:
             self.category_var = ttk.StringVar(value="All" if result_building is None else "Result")
             self.category_choice = ttk.Combobox(building_frame, textvariable=self.category_var,
@@ -573,7 +626,7 @@ class Building_Row:
             index = self.index
         else:
             self.index = index
-        widgets = [ self.category_choice,
+        self.widgets = [ self.category_choice,
                     self.building_choice, 
                     self.already_present_entry,
                     self.at_least_entry,
@@ -581,8 +634,8 @@ class Building_Row:
                     self.to_build_entry,
                     self.total_entry ]
         if self.delete_button:
-            widgets.append(self.delete_button)
-        for column, w in enumerate(widgets):
+            self.widgets.append(self.delete_button)
+        for column, w in enumerate(self.widgets):
             w.grid(row=index, column=column, padx=2, pady=2)
 
     def set_build_result(self, value):
@@ -605,7 +658,30 @@ class Building_Row:
             self.valid = True
             if self.first_station:
                 self.already_present_var.set(1)
-            update_values_from_building_input()
+            if self.building_choice.get() == "Let the program choose for me":
+                self.cbccheck = tkinter.Checkbutton(building_frame, variable=cbc, name="remove1")
+                self.cbabcheck = tkinter.Checkbutton(building_frame, variable=cbab, name="remove2")
+                self.cbocheck = tkinter.Checkbutton(building_frame, variable=cbo, name="remove3")
+                self.widgets += [self.cbccheck, self.cbabcheck, self.cbocheck]
+                for column, w in enumerate(self.widgets):
+                    w.grid(row=1, column=column, padx=2, pady=2)
+            else:
+                try:
+                    if hasattr(self, 'widgets'):
+                        for widget in self.widgets[:]:
+                            if widget in {self.cbccheck, self.cbabcheck, self.cbocheck}:
+                                widget.destroy()
+                                self.widgets.remove(widget)
+                    finalcol = 0
+                    if index != "":
+                        for column, w in enumerate(self.widgets):
+                            w.grid(row=index, column=column, padx=2, pady=2)
+                            finalcol = column
+                        for i in range(3):
+                            for widget in root.grid_slaves(row=index, column=finalcol+i+1):
+                                widget.grid_forget()
+                except AttributeError:
+                    pass
             if self is building_input[-1]:
                 add_empty_building_row()
                 if self.delete_button is None and not self.first_station:
