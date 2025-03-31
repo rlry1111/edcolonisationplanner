@@ -479,8 +479,21 @@ for idx, (slot, slot_name) in enumerate(all_slots.items()):
 
 criminalinput = ttk.BooleanVar()
 checkbox = ttk.Checkbutton(slots_frame, text="Allow contraband stations (pirate base, criminal outpost)", variable=criminalinput)
-checkbox.grid(row=2+len(all_slots), column=0, columnspan=5, padx=10, pady=10)
+checkbox.grid(row=3+len(all_slots), column=0, columnspan=5, padx=10, pady=10)
 
+choose_first_station_var = ttk.BooleanVar(value=True)
+first_station_cb_coriolis_var = ttk.BooleanVar(value=True)
+first_station_cb_asteroid_var = ttk.BooleanVar(value=True)
+first_station_cb_orbis_var = ttk.BooleanVar(value=True)
+first_station_checkbox = ttk.Checkbutton(right_frame, text="Let the program choose the first Station", variable=choose_first_station_var)
+first_station_frame = ttk.LabelFrame(right_frame, text="Test", labelwidget=first_station_checkbox, padding=2)
+first_station_frame.pack(side="top", padx=10, pady=5, fill="both")
+first_station_cbc_check = ttk.Checkbutton(first_station_frame, text="Allow Coriolis", variable=first_station_cb_coriolis_var)
+first_station_cbab_check = ttk.Checkbutton(first_station_frame, text="Allow Asteroid Base", variable=first_station_cb_asteroid_var)
+first_station_cbo_check = ttk.Checkbutton(first_station_frame, text="Allow Orbis", variable=first_station_cb_orbis_var)
+first_station_cbc_check.pack(side="left", padx=2, pady=2)
+first_station_cbab_check.pack(side="left", padx=2, pady=2)
+first_station_cbo_check.pack(side="left", padx=2, pady=2)
 
 construction_points_frame = ttk.LabelFrame(right_frame, text="Construction points", padding=2)
 construction_points_frame.pack(side="top", padx=10, pady=5, fill="both")
