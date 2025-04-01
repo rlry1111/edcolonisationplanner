@@ -11,7 +11,6 @@ import data
 from data import all_buildings, all_scores, all_categories
 
 #TODO
-#   Let the code select a starting system
 #   Add port economy (once Fdev fixes it)
 #   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
 
