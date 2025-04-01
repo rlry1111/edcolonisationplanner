@@ -1,17 +1,15 @@
-import re
 import os
 import sys
-from collections import defaultdict
+import tkinter
 
 import pulp
-
-import tkinter
+import pyglet
 import ttkbootstrap as ttk
 from ttkbootstrap.tooltip import ToolTip
-import pyglet
 
-from data import all_buildings, all_scores, all_categories
 import data
+from data import all_buildings, all_scores, all_categories
+
 #TODO
 #   Let the code select a starting system
 #   Add port economy (once Fdev fixes it)
