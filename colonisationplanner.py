@@ -352,9 +352,19 @@ class ScrollableFrame(ttk.Frame):
         self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
+
         container.bind_all("<MouseWheel>", self._on_mousewheel)
         container.bind_all("<Button-4>", self._on_up)
         container.bind_all("<Button-5>", self._on_down)
+        # Prevent Combo Boxes to use the wheel
+        container.unbind_class("TCombobox", "<MouseWheel>")
+        container.unbind_class("TCombobox", "<ButtonPress-4>")
+        container.unbind_class("TCombobox", "<ButtonPress-5>")
+
+    def should_scroll(self):
+        canvas_height = self.canvas.winfo_height()
+        rows_height = self.canvas.bbox("all")[3]
+        return rows_height > canvas_height # only scroll if the rows overflow the frame
 
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -363,13 +373,17 @@ class ScrollableFrame(ttk.Frame):
         self.canvas.itemconfig(self.window_id, width=event.width)
 
     def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        if self.should_scroll():
+            self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def _on_up(self, event):
-        self.canvas.yview_scroll(-1, "units")
+        if self.should_scroll():
+            self.canvas.yview_scroll(-1, "units")
 
     def _on_down(self, event):
-        self.canvas.yview_scroll(1, "units")
+        if self.should_scroll():
+            self.canvas.yview_scroll(1, "units")
+
 
 # Main window
 root = ttk.Window(themename="darkly")
@@ -384,6 +398,17 @@ root.title("Elite Dangerous colonisation planner")
 root.geometry("1000x1000")
 scroll_frame = ScrollableFrame(root)
 scroll_frame.pack(fill="both", expand=True)
+
+def on_dark_mode_change(*args):
+    if dark_mode_var.get():
+        root.style.theme_use("darkly")
+    else:
+        root.style.theme_use("litera")
+
+dark_mode_var = ttk.BooleanVar(value=True)
+dark_mode_button = ttk.Checkbutton(scroll_frame.scrollable_frame, text="Dark mode", variable=dark_mode_var, bootstyle="round-toggle")
+dark_mode_var.trace_add("write", on_dark_mode_change)
+dark_mode_button.place(x=5, y=5)
 
 maximizeinput = ttk.StringVar()
 frame = ttk.Frame(scroll_frame.scrollable_frame)
