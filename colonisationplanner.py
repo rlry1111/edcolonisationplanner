@@ -469,6 +469,10 @@ for idx, (slot, slot_name) in enumerate(all_slots.items()):
     used_slots_after_vars[slot] = ttk.IntVar()
 
     label = ttk.Label(slots_frame, text=slot_name)
+    if slot_name == "Orbital":
+        ToolTip(label, "Including asteroid bases (not first station) but excluding first station")
+    if slot_name == "Asteroid":
+        ToolTip(label, "Excluding first station")
     available = ttk.Entry(slots_frame, textvariable=available_slots_currently_vars[slot],
                           validate="key", validatecommand=(vcmd, "%P"), width=7, justify=ttk.RIGHT)
     total = ttk.Entry(slots_frame, textvariable=total_slots_currently_vars[slot],
