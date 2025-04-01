@@ -425,7 +425,7 @@ resultvars = {}
 mixed_frame = ttk.Frame(scroll_frame.scrollable_frame)
 mixed_frame.pack()
 
-constraint_frame = ttk.LabelFrame(mixed_frame, text="Sytem Stats", padding=2)
+constraint_frame = ttk.LabelFrame(mixed_frame, text="System Stats", padding=2)
 constraint_frame.pack(padx=10, pady=5, side="left", fill="y")
 ttk.Label(constraint_frame, text="min. value").grid(column=1, row=1)
 ttk.Label(constraint_frame, text="max. value").grid(column=2, row=1)
