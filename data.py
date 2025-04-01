@@ -1,9 +1,16 @@
 from collections import namedtuple, defaultdict
 
-all_scores = ["initial_population_increase", "max_population_increase", "security", "tech_level", "wealth", "standard_of_living", "development_level", "construction_cost"]
+base_scores = ["initial_population_increase", "max_population_increase", "security", "tech_level", "wealth", "standard_of_living", "development_level", "construction_cost"]
+compound_scores = [ "system_score_(beta)" ]
+all_scores = base_scores + compound_scores
 
-Building = namedtuple("Building", ['slot'] + all_scores + ['T2points', 'T3points', 'dependencies'],
-                      defaults=(0,)*len(all_scores) + (0, 0, []))
+# System score from https://forums.frontier.co.uk/threads/v3-of-the-colonization-construction-spreadsheet-is-now-available.635762/
+def compute_compound_score(score, values):
+    if score == "system_score_(beta)":
+        return values["security"] + values["tech_level"] + values["wealth"] + values["standard_of_living"]
+
+Building = namedtuple("Building", ['slot'] + base_scores + ['T2points', 'T3points', 'dependencies'],
+                      defaults=(0,)*len(base_scores) + (0, 0, []))
 
 all_buildings = {}
 all_categories = defaultdict(list)
@@ -116,8 +123,14 @@ def from_printable(display_name):
 
 # Solution defined as a dictionary Building_Name to number of buildings
 def print_scores(solution):
-    for score in all_scores:
+    values = {}
+    for score in base_scores:
         value = sum(getattr(all_buildings[b], score) * nb for b, nb in solution.items())
+        values[score] = value
         print(score, value)
+    for score in compound_scores:
+        values[score] = compute_compound_score(score, values)
+        print(score, values[score])
+
     print(sum(all_buildings[b].T2points * nb for b, nb in solution.items() if all_buildings[b].T2points != "port"))
     print(sum(all_buildings[b].T3points * nb for b, nb in solution.items() if all_buildings[b].T3points != "port"))
