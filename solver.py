@@ -1,0 +1,259 @@
+import pulp
+import sys
+
+import data
+from data import all_buildings, all_scores, all_categories, all_slots
+
+if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
+    #I'm bundling the windows CBC solver with this .exe, so this might not work on non windows OS
+    cbc_path = os.path.join(sys._MEIPASS, "cbc.exe")
+    solver = pulp.COIN_CMD(path=cbc_path)
+else:
+    solver = None
+
+def convert_maybe(variable, default=None):
+    value = variable.get()
+    if value != "": return int(value)
+    return default
+
+def solve(main_frame):
+    #requirements
+    M = 10000
+
+    # Get data from the Entry widgets
+    orbitalfacilityslots = main_frame.available_slots_currently_vars["space"].get()
+    groundfacilityslots = main_frame.available_slots_currently_vars["ground"].get()
+    asteroidslots = main_frame.available_slots_currently_vars["asteroid"].get()
+    maximize = data.from_printable(main_frame.maximizeinput.get())
+    initial_T2points = main_frame.T2points_variable.get()
+    initial_T3points = main_frame.T3points_variable.get()
+    choose_first_station = main_frame.choose_first_station_var.get()
+
+    if not choose_first_station and data.from_printable(main_frame.building_input[0].name_var.get()) not in all_buildings:
+        main_frame.print_result("Error: pick your first station")
+        return None
+
+    nb_ports_already_present = sum(row.already_present for row in main_frame.building_input if row.is_port)
+    max_nb_ports = orbitalfacilityslots + groundfacilityslots + nb_ports_already_present
+
+    #problem
+    direction = pulp.LpMinimize if maximize == "construction_cost" else pulp.LpMaximize
+    prob = pulp.LpProblem("optimal_system_colonization_layout", direction)
+
+    #create all the variables for each of the facilities
+    all_vars = {} # for each building name, the variables that decide how many will be BUILT
+    first_station_vars = {} # for each building name, a boolean variable for the first station
+    all_values = {} # for each building name, the expressions that give how many will be in TOTAL (=all_var + already_present)
+    port_vars = {} # for ports: for each port name, kth variable is 1 if the k-th port built is of this type
+    for n, b in all_buildings.items():
+        if not data.is_port(b):
+            all_vars[n] = pulp.LpVariable(n, cat='Integer', lowBound=0)
+        else:
+            # orbital and planetary ports, subject to cost increase
+            # Speculation for how construction points increase based on
+            # https://old.reddit.com/r/EliteDangerous/comments/1jfm0y6/psa_construction_points_costs_triple_after_third/
+            port_vars[n] = [ pulp.LpVariable(f"{n}_{k+1}", cat='Binary') for k in range(max_nb_ports) ]
+            all_vars[n] = pulp.lpSum(port_vars[n])
+        all_values[n] = all_vars[n]
+
+    if choose_first_station:
+        for i in all_categories["First Station"]:
+            first_station_vars[i] = pulp.LpVariable("first station binary variable for " + i, cat="Binary")
+            all_values[i] = all_values[i] + first_station_vars[i]
+
+        T2_benefit = all_buildings[i].T2points
+        if T2_benefit != "port" and T2_benefit > 0:
+            initial_T2points = initial_T2points + T2_benefit * first_station_vars[i]
+        T3_benefit = all_buildings[i].T3points
+        if T3_benefit != "port" and T3_benefit > 0:
+            initial_T3points = initial_T3points + T3_benefit * first_station_vars[i]
+
+        if not main_frame.first_station_cb_coriolis_var.get():
+            prob += first_station_vars["Coriolis"] == 0, "cannot build coriolis"
+        if not main_frame.first_station_cb_asteroid_var.get():
+            prob += first_station_vars["Asteroid_Base"] == 0, "cannot build asteroid base"
+        if not main_frame.first_station_cb_orbis_var.get():
+            prob += first_station_vars["Orbis_or_Ocellus"] == 0, "cannot build orbis/ocellus"
+        prob += pulp.lpSum(first_station_vars.values()) == 1, "only one first station"
+
+    if not main_frame.criminalinput.get():
+        all_vars["Pirate_Base"].upBound = 0
+        all_vars["Criminal_Outpost"].upBound = 0
+        if "Criminal_Outpost" in first_station_vars:
+            first_station_vars["Criminal_Outpost"].upBound = 0
+
+    # number of slots
+    usedslots = {}
+    for slot in ("space", "ground"):
+        usedslots[slot] = pulp.lpSum(all_vars[building_name]
+                                     for building_name, building in all_buildings.items()
+                                     if building.slot == slot)
+
+    #number of slots
+    prob += all_vars["Asteroid_Base"] <= asteroidslots, "asteroid slots"
+    prob += usedslots["space"] <= orbitalfacilityslots, "orbital facility slots"
+    prob += usedslots["ground"] <= groundfacilityslots, "ground facility slots"
+
+    # Include already present buildings as constants in all_values[...]
+    for row in main_frame.building_input:
+        if not row.valid:
+            continue
+        if row.first_station and choose_first_station:
+            continue
+        building_name = row.building_name
+        already_present = row.already_present
+        if already_present:
+            if building_name != 'Let_the_program_choose_for_me':
+                all_values[building_name] = all_values[building_name] + already_present
+
+                if building_name in ["Pirate_Base", "Criminal_Outpost"] and not main_frame.criminalinput.get():
+                    main_frame.print_result("Error: criminal outpost or pirate base already present, but you do not want criminal outposts to be built")
+                    return False
+
+    # Already present ports can not be built
+    for port_var in port_vars.values():
+        for k in range(nb_ports_already_present):
+            port_var[k].upBound = 0
+
+    # Constraints on the total number of facilities in the system
+    for row in main_frame.building_input:
+        if not row.valid:
+            continue
+        building_name = row.building_name
+        at_least = convert_maybe(row.at_least_var)
+        if at_least is not None:
+            prob += all_values[building_name] >= at_least
+        at_most = convert_maybe(row.at_most_var)
+        if at_most is not None:
+            prob += all_values[building_name] <= at_most
+
+    # Consistency constraints for the port variables
+    for k in range(max_nb_ports):
+        # Only one port can be k-th
+        prob += pulp.lpSum(port_var[k] for port_var in port_vars.values()) <= 1, f"port ordering limit {k+1}"
+        if k > nb_ports_already_present:
+            # No k-th port if there was no (k-1)-th port
+            prob += pulp.lpSum(port_var[k] for port_var in port_vars.values()) <= pulp.lpSum(port_var[k-1] for port_var in port_vars.values()), f"port ordering consistency {k+1}"
+
+    # Computing system scores
+    systemscores = {}
+    for score in data.base_scores:
+        if score != "construction_cost":
+            systemscores[score] = pulp.lpSum(getattr(building, score) * all_values[building_name]
+                                             for building_name, building in all_buildings.items())
+        else:
+            # Do not count already present buildings for construction cost, but count the chosen first station
+            systemscores[score] = pulp.lpSum(getattr(building, score) * all_vars[building_name]
+                                             for building_name, building in all_buildings.items())
+            if choose_first_station:
+                systemscores[score] += pulp.lpSum(getattr(all_buildings[building_name], score) * var
+                                                 for building_name, var in first_station_vars.items())
+
+    for score in data.compound_scores:
+        systemscores[score] = data.compute_compound_score(score, systemscores)
+
+    # Objective function
+    if maximize in systemscores:
+        prob += systemscores[maximize]
+    else:
+        main_frame.print_result(f"Error: One or more inputs are blank: select an objective to optimize")
+        return False
+
+    # Constraints on minimum and maximum scores
+    for score in all_scores:
+        minvalue = convert_maybe(main_frame.minvars[score])
+        maxvalue = convert_maybe(main_frame.maxvars[score])
+        if minvalue is not None:
+            prob += systemscores[score] >= minvalue, "minimum " + score
+        if maxvalue is not None:
+            prob += systemscores[score] <= maxvalue, "maximum " + score
+
+    # Constraints on the construction points
+    portsT2constructionpoints = pulp.lpSum( pulp.lpSum(port_var[k] for name, port_var in port_vars.items()
+                                                       if all_buildings[name].T2points == "port") * max(3, 2*k+1)
+                                            for k in range(max_nb_ports))
+    portsT3constructionpoints = pulp.lpSum( pulp.lpSum(port_var[k] for name, port_var in port_vars.items()
+                                                       if all_buildings[name].T3points == "port") * max(6, 6*k)
+                                            for k in range(max_nb_ports))
+
+    finalT2points = pulp.lpSum( building.T2points * all_vars[name]
+                        for name, building in all_buildings.items()
+                        if building.T2points != "port" ) - portsT2constructionpoints + initial_T2points
+    finalT3points = pulp.lpSum( building.T3points * all_vars[name]
+                        for name, building in all_buildings.items()
+                        if building.T3points != "port" ) - portsT3constructionpoints + initial_T3points
+
+    prob += finalT2points >= 0, "tier 2 construction points"
+    prob += finalT3points >= 0, "tier 3 construction points"
+
+    #sort out dependencies for facilities
+    indicator_dependency_variables = {}
+    ap_counter = 1
+    for target_name, target_building in all_buildings.items():
+        if target_building.dependencies:
+            deps = tuple(target_building.dependencies)
+            if  deps not in indicator_dependency_variables:
+                individual_variables = [ (name, pulp.LpVariable(f"indic {name}", cat="Binary"))
+                                         for name in target_building.dependencies ]
+                for name, bool_var in individual_variables:
+                    prob += all_values[name] <= M * bool_var
+                    prob += all_values[name] >= bool_var
+                if len(target_building.dependencies) == 1:
+                    any_positive = individual_variables[0][1]
+                else:
+                    any_positive = pulp.LpVariable(f"any_positive {ap_counter}", cat="Binary")
+                    ap_counter += 1
+                    for name, bool_var in individual_variables:
+                        prob += any_positive >= bool_var
+                    prob += any_positive <= M * pulp.lpSum(bool_var for name, bool_var in individual_variables)
+                indicator_dependency_variables[deps] = any_positive
+
+            prob += all_values[target_name] <= M * indicator_dependency_variables[deps]
+
+    # Solve the problem
+    prob.solve(solver)
+    if pulp.LpStatus[prob.status] == "Infeasible":
+        main_frame.print_result("Error: There is no possible system arrangement that can fit the conditions you have specified")
+        return False
+
+    main_frame.clear_result()
+    for building_name in all_buildings.keys():
+        value = int(pulp.value(all_vars[building_name]))
+        if value <= 0:
+            continue
+        result_row = None
+        for row in reversed(main_frame.building_input): # Makes sure I finish with the First Station
+            if row.building_name == building_name:
+                result_row = row
+                break
+        if result_row is None:
+            result_row = main_frame.add_empty_building_row(result_building=data.to_printable(building_name))
+        result_row.set_build_result(value)
+
+    for score in all_scores:
+        main_frame.resultvars[score].set(int(pulp.value(systemscores[score])))
+
+    main_frame.T2points_variable_after.set(int(pulp.value(finalT2points)))
+    main_frame.T3points_variable_after.set(int(pulp.value(finalT3points)))
+
+    main_frame.available_slots_after_vars["space"].set(orbitalfacilityslots - int(pulp.value(usedslots["space"])))
+    main_frame.available_slots_after_vars["ground"].set(groundfacilityslots - int(pulp.value(usedslots["ground"])))
+    main_frame.available_slots_after_vars["asteroid"].set(asteroidslots - int(pulp.value(all_vars["Asteroid_Base"])))
+
+    port_types = set()
+    port_order = []
+    for port_index in range(nb_ports_already_present, max_nb_ports):
+        for port_name, port_var in port_vars.items():
+            if pulp.value(port_var[port_index]) >= 1:
+                port_types.add(port_name)
+                port_order.append(port_name)
+    if len(port_types) > 1:
+        main_frame.set_port_ordering(port_order)
+
+    if choose_first_station:
+        for fs_name, fs_var in first_station_vars.items():
+            if pulp.value(fs_var) == 1:
+                main_frame.building_input[0].name_var.set(data.to_printable(fs_name))
+                main_frame.building_input[0].set_build_result(1)
+
+    return True

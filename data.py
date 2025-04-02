@@ -4,6 +4,8 @@ base_scores = ["initial_population_increase", "max_population_increase", "securi
 compound_scores = [ "system_score_(beta)" ]
 all_scores = base_scores + compound_scores
 
+all_slots = {"space": "Orbital", "ground": "Ground", "asteroid": "Asteroid"}
+
 # System score from https://forums.frontier.co.uk/threads/v3-of-the-colonization-construction-spreadsheet-is-now-available.635762/
 def compute_compound_score(score, values):
     if score == "system_score_(beta)":
