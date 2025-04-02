@@ -13,6 +13,7 @@ from building_row import BuildingRow
 from scrollable_frame import ScrollableFrame
 from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value
 import solver
+import export
 
 #TODO
 #   Add port economy (once Fdev fixes it)
@@ -32,7 +33,7 @@ class MainWindow(ttk.Window):
         self.port_order = None
 
         self.create_widgets_and_layout()
-        
+
     def create_widgets_and_layout(self):
         self.create_dark_mode()
         self.create_optimization_criterion_choice()
@@ -306,6 +307,8 @@ class MainWindow(ttk.Window):
         solve_button.pack(padx=5, side="left")
         clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button)
         clear_button.pack(padx=5, side="left")
+        export_button = ttk.Button(button_frame, text="Export Result", command=self.on_export_button)
+        export_button.pack(padx=5, side="left")
         button_frame.pack(pady=7)
 
     # Handlers for action buttons: "solve" and "clear result"
@@ -317,6 +320,10 @@ class MainWindow(ttk.Window):
     def on_clear_button(self):
         self.clear_result()
         self.add_empty_building_row()
+
+    def on_export_button(self):
+        result = export.extract_from_frame(self, with_solution=True)
+        print(result)
 
     # Bottom-most panel: several rows for different building types. Also where the result is displayed
     def create_result_panel(self):
