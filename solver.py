@@ -221,13 +221,7 @@ def solve(main_frame):
         value = int(pulp.value(all_vars[building_name]))
         if value <= 0:
             continue
-        result_row = None
-        for row in reversed(main_frame.building_input): # Makes sure I finish with the First Station
-            if row.building_name == building_name:
-                result_row = row
-                break
-        if result_row is None:
-            result_row = main_frame.add_empty_building_row(result_building=data.to_printable(building_name))
+        result_row = main_frame.get_row_for_building(building_name)
         result_row.set_build_result(value)
 
     for score in all_scores:
