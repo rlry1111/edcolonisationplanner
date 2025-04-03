@@ -1,13 +1,16 @@
 import json
-from data import all_slots, all_scores, from_printable, to_printable
+from data import all_slots, all_scores, all_buildings, from_printable, to_printable, compute_all_scores, is_port, ConstructionPointsCounter
 from tksetup import get_int_var_value
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 def convert_maybe(variable, default=None):
     value = variable.get()
     if value != "": return int(value)
     return default
 
+def maybe_add(result, name, value):
+    if value is not None:
+        result[name] = value
 
 class SaveFile:
     def __init__(self, filename):
@@ -33,14 +36,14 @@ class SaveFile:
             return []
         return list(self.contents[system].keys())
 
-    def load_plan(self, system, plan, main_frame):
+    def load_plan(self, system, plan, main_frame, with_solution=False):
         try:
             result = self.contents[system][plan]
         except KeyError as e:
             self.warnings = f"Unknown system or plan '{e}'"
         import_into_frame(main_frame, result)
-        # if "solution" in result:
-        #     import_solution_into_frame(main_frame, result)
+        if with_solution:
+            import_solution_into_frame(main_frame, result)
 
     def save_plan(self, system, plan, main_frame):
         result = extract_from_frame(main_frame)
@@ -114,43 +117,40 @@ def extract_from_frame(main_frame, with_solution=True):
 
     if not with_solution:
         return result
-    
-    result["solution"] = rs = {}
+
+    result["solution"] = solution = {}
+    if main_frame.choose_first_station_var.get():
+        solution["first_station"] = main_frame.building_input[0].building_name
+    solution["to_build"] = rs = {}
     for row in main_frame.building_input:
         if not row.valid:
+            continue
+        if main_frame.choose_first_station_var.get() and row.first_station:
             continue
         to_build = get_int_var_value(row.to_build_var)
         if to_build:
             rs[row.building_name] = to_build
 
     if main_frame.port_order:
-        result["solution.port_order"] = main_frame.port_order
+        solution["port_order"] = main_frame.port_order
 
+    return result
+
+def extract_min_max_from_variables(minvar, maxvar):
+    min_value = convert_maybe(minvar)
+    max_value = convert_maybe(maxvar)
+    if min_value is None and max_value is None:
+        return None
+    result = {}
+    maybe_add(result, "min", min_value)
+    maybe_add(result, "max", max_value)
     return result
 
 def extract_score_from_frame(main_frame, score):
-    min_value = convert_maybe(main_frame.minvars[score])
-    max_value = convert_maybe(main_frame.maxvars[score])
-    if min_value is None and max_value is None:
-        return None
-    result = {}
-    if min_value is not None:
-        result["min"] = min_value
-    if max_value is not None:
-        result["max"] = max_value
-    return result
+    return extract_min_max_from_variables(main_frame.minvars[score], main_frame.maxvars[score])
 
 def extract_building_constraint_from_row(row):
-    min_value = convert_maybe(row.at_least_var)
-    max_value = convert_maybe(row.at_most_var)
-    if min_value is None and max_value is None:
-        return None
-    result = {}
-    if min_value is not None:
-        result["min"] = min_value
-    if max_value is not None:
-        result["max"] = max_value
-    return result
+    return extract_min_max_from_variables(row.at_least_var, row.at_most_var)
 
 def combine_building_constraints(first, second):
     def combine(v1, v2, combiner=min):
@@ -162,10 +162,8 @@ def combine_building_constraints(first, second):
     result = {}
     min_value = combine(first.get("min"), second.get("min"), max) ## Keep the strongest constraint
     max_value = combine(first.get("max"), second.get("max"), min) ## Keep the strongest constraint
-    if min_value is not None:
-        result["min"] = min_value
-    if max_value is not None:
-        result["max"] = max_value
+    maybe_add(result, "min", min_value)
+    maybe_add(result, "max", max_value)
     return result
 
 
@@ -222,4 +220,83 @@ def import_into_frame(main_frame, result):
     else:
         main_frame.auto_construction_points.set(True)
 
-    main_frame.add_empty_building_row()
+    if main_frame.building_input[-1].valid:
+        main_frame.add_empty_building_row()
+
+# Uses result["solution"]
+# Assumes that the current state of main_frame is consistent with the rest of the contents of result
+# TODO: if there is a benefit, compute everything from result without relying on main_frame to be consistent
+def import_solution_into_frame(main_frame, result):
+    main_frame.clear_result()
+    solution = result.get("solution", {})
+    to_build = solution.get("to_build", {})
+    first_station_name = solution.get("first_station", None)
+    if not to_build and not first_station_name:
+        return
+    for building_name, nb in to_build.items():
+        result_row = main_frame.get_row_for_building(building_name)
+        result_row.set_build_result(nb)
+
+    port_order = solution.get("port_order", [])
+    if port_order:
+        main_frame.set_port_ordering(port_order)
+
+    # Need to combine solution with already present buildings to compute total scores
+    already_present = result.get("already_present", {})
+    port_order = result.get("already_present.ports", [])
+    first_station = {}
+    if first_station_name:
+        first_station = {first_station_name: 1}
+    elif result["first_station"]:
+        first_station = {result["first_station"]: 1}
+    already_present = combine_solutions(already_present, first_station,
+                                        count_ports_from_port_order(port_order))
+    complete_system = combine_solutions(to_build, already_present)
+
+    # Compute scores, except for construction cost which does not count already present buildings
+    scores = compute_all_scores(complete_system)
+    partial_scores = compute_all_scores(to_build)
+    scores["construction_cost"] = partial_scores["construction_cost"]
+    for score, value in scores.items():
+        main_frame.resultvars[score].set(value)
+
+    # Count available slots
+    for slot in all_slots:
+        available = main_frame.available_slots_currently_vars[slot].get()
+        if slot == "asteroid":
+            used = to_build.get("Asteroid_Base", 0)
+        else:
+            used = sum(nb_built for building_name, nb_built in to_build.items()
+                       if all_buildings[building_name].slot == slot)
+        main_frame.available_slots_after_vars[slot].set(available - used)
+
+    # Count construction points.
+    nb_ports_already_present = sum(is_port(all_buildings[name]) * nb
+                                   for name, nb in result.get("already_present", {}).items())
+    construction_points = ConstructionPointsCounter(nb_ports_already_present)
+    construction_points.T2points = main_frame.T2points_variable.get()
+    construction_points.T3points = main_frame.T3points_variable.get()
+    if first_station_name:
+        construction_points.add_building(all_buildings[first_station_name], 1, first_station=True)
+    for name, nb in to_build.items():
+        construction_points.add_building(all_buildings[name], nb)
+    main_frame.T2points_variable_after.set(construction_points.T2points)
+    main_frame.T3points_variable_after.set(construction_points.T3points)
+
+    # Set First Station if it is specified
+    if first_station_name:
+        main_frame.building_input[0].name_var.set(to_printable(first_station_name))
+        main_frame.building_input[0].set_build_result(1)
+
+    if main_frame.building_input[-1].valid:
+        main_frame.add_empty_building_row()
+
+def combine_solutions(*solutions):
+    result = sum((Counter(solution) for solution in solutions), Counter())
+    return dict(result)
+
+def count_ports_from_port_order(port_order):
+    result = Counter()
+    for name, value in port_order:
+        result[name] += value
+    return dict(result)

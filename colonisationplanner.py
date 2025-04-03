@@ -253,6 +253,8 @@ class MainWindow(ttk.Window):
                 row.already_present_var.set(0)
         else:
             self.building_input[0].building_choice.config(state="readonly")
+            if self.building_input[0].valid:
+                self.building_input[0].already_present_var.set(1)
             for row in self.building_input[1:]:
                 row.already_present_entry.config(state="normal")
 
@@ -374,13 +376,8 @@ class MainWindow(ttk.Window):
         system = self.system_name_var.get()
         plan = self.plan_name_var.get()
         if system and plan and plan in self.save_file.get_plan_list(system):
-            self.save_file.load_plan(system, plan, self)
+            self.save_file.load_plan(system, plan, self, with_solution=True)
 
-    # def on_import_button(self):
-    #     self.save_file.load_plan("Favorite System", "Best Plan", self)
-    #     w = self.save_file.get_warnings()
-    #     if w:
-    #         print("Warning:", w)
 
     # Bottom-most panel: several rows for different building types. Also where the result is displayed
     def create_result_panel(self):
@@ -458,9 +455,7 @@ class MainWindow(ttk.Window):
         self.add_empty_building_row(firststation=True)
 
     def update_values_from_building_input(self, *args):
-        T2points = 0
-        T3points = 0
-        number_of_ports = 0
+        construction_points = data.ConstructionPointsCounter()
         slots = {name: 0 for name in self.available_slots_currently_vars.keys() }
         for row in self.building_input:
             if row.valid:
@@ -471,23 +466,7 @@ class MainWindow(ttk.Window):
                 if row.building_name == "Asteroid_Base":
                     slots["asteroid"] += nb_present
 
-                if row.first_station and (building.T2points != "port" and building.T2points > 0):
-                    T2points += building.T2points
-                if row.first_station and (building.T3points != "port" and building.T3points > 0):
-                    T3points += building.T3points
-                if not row.first_station:
-                    if building.T2points == "port":
-                        for _ in range(nb_present):
-                            T2points -= max(3, 1+2*number_of_ports)
-                            number_of_ports += 1
-                    else:
-                        T2points += nb_present * building.T2points
-                    if building.T3points == "port":
-                        for _ in range(nb_present):
-                            T3points -= max(6, 6*number_of_ports)
-                            number_of_ports += 1
-                    else:
-                        T3points += nb_present * building.T3points
+                construction_points.add_building(building, nb_present, row.first_station)
 
         for slot, nb_used in slots.items():
             if self.slot_behavior == "fix_available":
@@ -498,9 +477,8 @@ class MainWindow(ttk.Window):
                 self.available_slots_currently_vars[slot].set(total - nb_used)
 
         if self.auto_construction_points.get():
-            self.T2points_variable.set(T2points)
-            self.T3points_variable.set(T3points)
-
+            self.T2points_variable.set(construction_points.T2points)
+            self.T3points_variable.set(construction_points.T3points)
 
 
 if __name__ == "__main__":
