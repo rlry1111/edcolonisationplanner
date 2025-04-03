@@ -13,6 +13,7 @@ from building_row import BuildingRow
 from scrollable_frame import ScrollableFrame
 from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value
 import solver
+import export
 
 #TODO
 #   Add port economy (once Fdev fixes it)
@@ -20,25 +21,29 @@ import solver
 
 # Main window
 class MainWindow(ttk.Window):
-    def __init__(self):
+    def __init__(self, savefile):
         super().__init__(themename="darkly")
         self.style.configure('.', font=("Eurostile", 12))
         register_validate_commands(self)
         self.title("Elite Dangerous colonisation planner")
         self.geometry("1000x1000")
-        self.scroll_frame = ScrollableFrame(self)
-        self.scroll_frame.pack(fill="both", expand=True)
         self.building_input = []
         self.port_order = None
-
+        self.save_file = export.SaveFile(savefile)
+        w = self.save_file.get_warnings()
+        if w:
+            print("Warning:", w)
         self.create_widgets_and_layout()
-        
+
     def create_widgets_and_layout(self):
+        self.create_import_export_panel()
         self.create_dark_mode()
+        self.scroll_frame = ScrollableFrame(self)
+        self.scroll_frame.pack(fill="both", expand=True)
         self.create_optimization_criterion_choice()
         self.create_main_panel()
-        self.create_action_buttons()
         self.create_result_panel()
+        self.create_action_buttons()
 
 
     # Dropdown menu at the top for choosing what to optimize
@@ -81,7 +86,7 @@ class MainWindow(ttk.Window):
     # Dark-mode toggle button at the top left
     def create_dark_mode(self):
         self.dark_mode_var = ttk.BooleanVar(value=True)
-        self.dark_mode_button = ttk.Checkbutton(self.scroll_frame.scrollable_frame, text="Dark mode",
+        self.dark_mode_button = ttk.Checkbutton(self, text="Dark mode",
                                                 variable=self.dark_mode_var, bootstyle="round-toggle")
         self.dark_mode_var.trace_add("write", self.on_dark_mode_change)
         self.dark_mode_button.place(x=5, y=5)
@@ -248,6 +253,8 @@ class MainWindow(ttk.Window):
                 row.already_present_var.set(0)
         else:
             self.building_input[0].building_choice.config(state="readonly")
+            if self.building_input[0].valid:
+                self.building_input[0].already_present_var.set(1)
             for row in self.building_input[1:]:
                 row.already_present_entry.config(state="normal")
 
@@ -301,12 +308,35 @@ class MainWindow(ttk.Window):
 
     # Action buttons in the middle of the window
     def create_action_buttons(self):
-        button_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        button_frame = ttk.Frame(self)
         solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve)
         solve_button.pack(padx=5, side="left")
         clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button)
         clear_button.pack(padx=5, side="left")
+        clear_all_button = ttk.Button(button_frame, text="Clear All Values", command=self.on_clear_all_button, bootstyle="danger")
+        clear_all_button.pack(padx=5, side="left")
         button_frame.pack(pady=7)
+
+    def create_import_export_panel(self):
+        frame = ttk.Frame(self)
+        self.system_name_var = ttk.StringVar()
+        self.plan_name_var = ttk.StringVar()
+        ttk.Label(frame, text="System Name:").pack(padx=5, pady=5, side="left")
+        self.system_name_entry = ttk.Combobox(frame, textvariable=self.system_name_var, width=20,
+                                         values=self.save_file.get_system_list())
+        self.system_name_entry.pack(padx=5, pady=5, side="left")
+        ttk.Label(frame, text="Plan name").pack(padx=5, pady=5, side="left")
+        self.plan_name_entry = ttk.Combobox(frame, textvariable=self.plan_name_var, width=20, values=[])
+        self.plan_name_entry.pack(padx=5, pady=5, side="left")
+
+        self.system_name_var.trace_add("write", self.on_select_system)
+        self.plan_name_var.trace_add("write", self.on_select_plan)
+
+        save_button = ttk.Button(frame, text="Save", command=self.on_save_button)
+        save_button.pack(padx=5, side="left")
+        reload_button = ttk.Button(frame, text="Reload", command=self.on_select_plan)
+        reload_button.pack(padx=5, side="left")
+        frame.pack(pady=7)
 
     # Handlers for action buttons: "solve" and "clear result"
     def on_solve(self):
@@ -316,7 +346,38 @@ class MainWindow(ttk.Window):
 
     def on_clear_button(self):
         self.clear_result()
-        self.add_empty_building_row()
+        if self.building_input[0].valid:
+            self.add_empty_building_row()
+
+    def on_clear_all_button(self):
+        self.clear_all()
+
+    def on_save_button(self):
+        system = self.system_name_var.get()
+        plan = self.plan_name_var.get()
+        if system and plan:
+            self.save_file.save_plan(system, plan, self)
+            w = self.save_file.get_warnings()
+            if w:
+                print("Warning:", w)
+        self.system_name_entry.config(values=self.save_file.get_system_list())
+        self.plan_name_entry.config(values=self.save_file.get_plan_list(system))
+
+    def on_select_system(self, *args):
+        system = self.system_name_var.get()
+        plans = self.save_file.get_plan_list(system)
+        self.plan_name_entry.config(values=plans)
+        if plans:
+            self.plan_name_var.set(plans[0])
+        else:
+            self.plan_name_var.set("")
+
+    def on_select_plan(self, *args):
+        system = self.system_name_var.get()
+        plan = self.plan_name_var.get()
+        if system and plan and plan in self.save_file.get_plan_list(system):
+            self.save_file.load_plan(system, plan, self, with_solution=True)
+
 
     # Bottom-most panel: several rows for different building types. Also where the result is displayed
     def create_result_panel(self):
@@ -347,6 +408,16 @@ class MainWindow(ttk.Window):
         row.pack(len(self.building_input) + 1)
         return row
 
+    def get_row_for_building(self, building_name, include_first_station=True):
+        result_row = None
+        for row in reversed(self.building_input): # Makes sure I finish with the First Station
+            if row.building_name == building_name:
+                result_row = row
+                break
+        if result_row is None or (result_row.first_station and not include_first_station):
+            result_row = self.add_empty_building_row(result_building=data.to_printable(building_name))
+        return result_row
+
     def clear_result(self):
         self.resultlabel.config(text="")
         self.port_order = None
@@ -370,10 +441,21 @@ class MainWindow(ttk.Window):
         for i, row in enumerate(self.building_input):
             row.pack(i+1)
 
+    def clear_all(self):
+        self.clear_result()
+        self.maximizeinput.set("")
+        for score in all_scores:
+            self.minvars[score].set("")
+            self.maxvars[score].set("")
+        self.choose_first_station_var.set(False)
+        self.auto_construction_points.set(True)
+        for row in self.building_input:
+            row.delete()
+        self.building_input = []
+        self.add_empty_building_row(firststation=True)
+
     def update_values_from_building_input(self, *args):
-        T2points = 0
-        T3points = 0
-        number_of_ports = 0
+        construction_points = data.ConstructionPointsCounter()
         slots = {name: 0 for name in self.available_slots_currently_vars.keys() }
         for row in self.building_input:
             if row.valid:
@@ -384,23 +466,7 @@ class MainWindow(ttk.Window):
                 if row.building_name == "Asteroid_Base":
                     slots["asteroid"] += nb_present
 
-                if row.first_station and (building.T2points != "port" and building.T2points > 0):
-                    T2points += building.T2points
-                if row.first_station and (building.T3points != "port" and building.T3points > 0):
-                    T3points += building.T3points
-                if not row.first_station:
-                    if building.T2points == "port":
-                        for _ in range(nb_present):
-                            T2points -= max(3, 1+2*number_of_ports)
-                            number_of_ports += 1
-                    else:
-                        T2points += nb_present * building.T2points
-                    if building.T3points == "port":
-                        for _ in range(nb_present):
-                            T3points -= max(6, 6*number_of_ports)
-                            number_of_ports += 1
-                    else:
-                        T3points += nb_present * building.T3points
+                construction_points.add_building(building, nb_present, row.first_station)
 
         for slot, nb_used in slots.items():
             if self.slot_behavior == "fix_available":
@@ -411,18 +477,19 @@ class MainWindow(ttk.Window):
                 self.available_slots_currently_vars[slot].set(total - nb_used)
 
         if self.auto_construction_points.get():
-            self.T2points_variable.set(T2points)
-            self.T3points_variable.set(T3points)
-
+            self.T2points_variable.set(construction_points.T2points)
+            self.T3points_variable.set(construction_points.T3points)
 
 
 if __name__ == "__main__":
     pyglet.options['win32_gdi_font'] = True
     if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
+        savefile = os.path.join(sys._MEIPASS, "saved_data.json")
         font_path = os.path.join(sys._MEIPASS, "eurostile.TTF")
         pyglet.font.add_file(font_path)
     else:
+        savefile = "./saved_data.json"
         pyglet.font.add_file('eurostile.TTF')
 
-    root = MainWindow()
+    root = MainWindow(savefile)
     root.mainloop()

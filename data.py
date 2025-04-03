@@ -114,6 +114,37 @@ make_category("Large Settlement", *(n for n in all_buildings.keys() if n.endswit
 def is_port(building):
     return building.T2points == "port" or building.T3points == "port"
 
+def get_T2port_cost(nb_previous_ports):
+    return max(3, 2*nb_previous_ports + 1)
+
+def get_T3port_cost(nb_previous_ports):
+    return max(6, 6*nb_previous_ports)
+
+class ConstructionPointsCounter:
+    def __init__(self, nb_previous_ports=0):
+        self.T2points = 0
+        self.T3points = 0
+        self.nb_previous_ports = nb_previous_ports
+
+    def add_building(self, building, nb=1, first_station=False):
+        if first_station and (building.T2points != "port" and building.T2points > 0):
+            self.T2points += building.T2points
+        if first_station and (building.T3points != "port" and building.T3points > 0):
+            self.T3points += building.T3points
+        if not first_station:
+            if building.T2points == "port":
+                for _ in range(nb):
+                    self.T2points -= get_T2port_cost(self.nb_previous_ports)
+                    self.nb_previous_ports += 1
+            else:
+                self.T2points += nb * building.T2points
+        if building.T3points == "port":
+            for _ in range(nb):
+                self.T3points -= get_T3port_cost(self.nb_previous_ports)
+                self.nb_previous_ports += 1
+        else:
+            self.T3points += nb * building.T3points
+
 def to_printable(name):
     return name.replace("_", " ")
 
@@ -124,15 +155,17 @@ def from_printable(display_name):
     return display_name.replace(" ", "_")
 
 # Solution defined as a dictionary Building_Name to number of buildings
-def print_scores(solution):
+def compute_all_scores(solution):
     values = {}
     for score in base_scores:
         value = sum(getattr(all_buildings[b], score) * nb for b, nb in solution.items())
         values[score] = value
-        print(score, value)
     for score in compound_scores:
         values[score] = compute_compound_score(score, values)
-        print(score, values[score])
 
+    return values
+
+
+def compute_construction_points(solution, port_order, nb_already_present_ports):
     print(sum(all_buildings[b].T2points * nb for b, nb in solution.items() if all_buildings[b].T2points != "port"))
     print(sum(all_buildings[b].T3points * nb for b, nb in solution.items() if all_buildings[b].T3points != "port"))
