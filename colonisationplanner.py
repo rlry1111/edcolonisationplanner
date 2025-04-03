@@ -27,8 +27,6 @@ class MainWindow(ttk.Window):
         register_validate_commands(self)
         self.title("Elite Dangerous colonisation planner")
         self.geometry("1000x1000")
-        self.scroll_frame = ScrollableFrame(self)
-        self.scroll_frame.pack(fill="both", expand=True)
         self.building_input = []
         self.port_order = None
         self.save_file = export.SaveFile(savefile)
@@ -38,12 +36,14 @@ class MainWindow(ttk.Window):
         self.create_widgets_and_layout()
 
     def create_widgets_and_layout(self):
+        self.create_import_export_panel()
         self.create_dark_mode()
+        self.scroll_frame = ScrollableFrame(self)
+        self.scroll_frame.pack(fill="both", expand=True)
         self.create_optimization_criterion_choice()
         self.create_main_panel()
-        self.create_action_buttons()
-        self.create_import_export_panel()
         self.create_result_panel()
+        self.create_action_buttons()
 
 
     # Dropdown menu at the top for choosing what to optimize
@@ -86,7 +86,7 @@ class MainWindow(ttk.Window):
     # Dark-mode toggle button at the top left
     def create_dark_mode(self):
         self.dark_mode_var = ttk.BooleanVar(value=True)
-        self.dark_mode_button = ttk.Checkbutton(self.scroll_frame.scrollable_frame, text="Dark mode",
+        self.dark_mode_button = ttk.Checkbutton(self, text="Dark mode",
                                                 variable=self.dark_mode_var, bootstyle="round-toggle")
         self.dark_mode_var.trace_add("write", self.on_dark_mode_change)
         self.dark_mode_button.place(x=5, y=5)
@@ -308,7 +308,7 @@ class MainWindow(ttk.Window):
 
     # Action buttons in the middle of the window
     def create_action_buttons(self):
-        button_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        button_frame = ttk.Frame(self)
         solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve)
         solve_button.pack(padx=5, side="left")
         clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button)
@@ -318,7 +318,7 @@ class MainWindow(ttk.Window):
         button_frame.pack(pady=7)
 
     def create_import_export_panel(self):
-        frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        frame = ttk.Frame(self)
         self.system_name_var = ttk.StringVar()
         self.plan_name_var = ttk.StringVar()
         ttk.Label(frame, text="System Name:").pack(padx=5, pady=5, side="left")
