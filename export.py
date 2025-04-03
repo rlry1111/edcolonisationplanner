@@ -1,6 +1,7 @@
 import json
 from data import all_slots, all_scores, from_printable, to_printable
 from tksetup import get_int_var_value
+from collections import defaultdict
 
 def convert_maybe(variable, default=None):
     value = variable.get()
@@ -79,7 +80,8 @@ def extract_from_frame(main_frame, with_solution=True):
         fsc["orbis"] = main_frame.first_station_cb_orbis_var.get()
     else:
         result["initial_state"] = "list"
-        result["already_present"] = ap = {}
+        result["already_present"] = ap = defaultdict(int)
+        result["already_present.ports"] = app = []
         result["first_station"] = main_frame.building_input[0].building_name
         for row in main_frame.building_input[1:]:
             if not row.valid:
@@ -87,7 +89,10 @@ def extract_from_frame(main_frame, with_solution=True):
             building_name = row.building_name
             already_present = row.already_present
             if already_present:
-                ap[building_name] = already_present
+                if row.is_port:
+                    app.append( (building_name, already_present) )
+                else:
+                    ap[building_name] = ap[building_name] + already_present
 
     if not main_frame.auto_construction_points.get():
         result["manual_construction_points"] = mcp = {}
@@ -100,7 +105,12 @@ def extract_from_frame(main_frame, with_solution=True):
             continue
         extracted = extract_building_constraint_from_row(row)
         if extracted is not None:
-            bc[row.building_name] = extracted
+            building_name = row.building_name
+            if building_name in bc:
+                combined = combine_building_constraints(extracted, bc[building_name])
+                bc[building_name] = combined
+            else:
+                bc[building_name] = extracted
 
     if not with_solution:
         return result
@@ -142,12 +152,29 @@ def extract_building_constraint_from_row(row):
         result["max"] = max_value
     return result
 
+def combine_building_constraints(first, second):
+    def combine(v1, v2, combiner=min):
+        if v1 is None:
+            return v2
+        if v2 is None:
+            return v1
+        return combiner(v1, v2)
+    result = {}
+    min_value = combine(first.get("min"), second.get("min"), max) ## Keep the strongest constraint
+    max_value = combine(first.get("max"), second.get("max"), min) ## Keep the strongest constraint
+    if min_value is not None:
+        result["min"] = min_value
+    if max_value is not None:
+        result["max"] = max_value
+    return result
+
+
 # This will ignore the solution, only imports the initial state and constraints
 def import_into_frame(main_frame, result):
     main_frame.clear_all()
 
-    main_frame.maximizeinput.set(to_printable(result["optimize"]))
-    for score, constraints in result["score_constraints"].items():
+    main_frame.maximizeinput.set(to_printable(result.get("optimize", "")))
+    for score, constraints in result.get("score_constraints", {}).items():
         if "min" in constraints:
             main_frame.minvars[score].set(constraints["min"])
         if "max" in constraints:
@@ -156,38 +183,42 @@ def import_into_frame(main_frame, result):
     if "slots_available" in result:
         main_frame.on_toggle_slot_input("fix_available")
         for slot in all_slots:
-            main_frame.available_slots_currently_vars[slot].set(result["slots_available"][slot])
+            main_frame.available_slots_currently_vars[slot].set(result["slots_available"].get(slot, 0))
     else:
+        st = result.get("slots_total", {})
         main_frame.on_toggle_slot_input("fix_total")
         for slot in all_slots:
-            main_frame.total_slots_currently_vars.set(result["slots_total"][slot])
-    main_frame.criminalinput.set(result["contraband_allowed"])
+            main_frame.total_slots_currently_vars.set(st.get(slot, 0))
+    main_frame.criminalinput.set(result.get("contraband_allowed", False))
 
-    for building_name, constraints in result["building_constraints"].items():
+    for building_name, constraints in result.get("building_constraints", {}).items():
         row = main_frame.get_row_for_building(building_name)
         if "min" in constraints:
             row.at_least_var.set(constraints["min"])
         if "max" in constraints:
             row.at_most_var.set(constraints["max"])
 
-    if result["initial_state"] == "automatic":
-        fsc = result["first_station_constraints"]
+    if result.get("initial_state", "list") == "automatic":
+        fsc = result.get("first_station_constraints", {})
         main_frame.choose_first_station_var.set(True)
-        main_frame.first_station_cb_coriolis_var.set(fsc["coriolis"])
-        main_frame.first_station_cb_asteroid_var.set(fsc["asteroid"])
-        main_frame.first_station_cb_orbis_var.set(fsc["orbis"])
+        main_frame.first_station_cb_coriolis_var.set(fsc.get("coriolis", True))
+        main_frame.first_station_cb_asteroid_var.set(fsc.get("asteroid", True))
+        main_frame.first_station_cb_orbis_var.set(fsc.get("orbis", True))
     else:
         main_frame.choose_first_station_var.set(False)
-        for building_name, already_present in result["already_present"].items():
+        for building_name, already_present in result.get("already_present", {}).items():
             row = main_frame.add_empty_building_row(result_building=to_printable(building_name))
             row.already_present_var.set(already_present)
-        main_frame.building_input[0].name_var.set(to_printable(result["first_station"]))
+        for building_name, already_present in result.get("already_present.ports", []):
+            row = main_frame.add_empty_building_row(result_building=to_printable(building_name))
+            row.already_present_var.set(already_present)
+        main_frame.building_input[0].name_var.set(to_printable(result.get("first_station", "Pick_your_first_station")))
 
     if "manual_construction_points" in result:
         main_frame.auto_construction_points.set(False)
         mcp = result["manual_construction_points"]
-        main_frame.T2points_variable.set(mcp["T2"])
-        main_frame.T3points_variable.set(mcp["T3"])
+        main_frame.T2points_variable.set(mcp.get("T2", 0))
+        main_frame.T3points_variable.set(mcp.get("T3", 0))
     else:
         main_frame.auto_construction_points.set(True)
 
