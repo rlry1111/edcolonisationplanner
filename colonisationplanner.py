@@ -3,7 +3,6 @@ from platformdirs import user_data_dir
 import sys
 import tkinter
 
-import pulp
 import pyglet
 import ttkbootstrap as ttk
 from ttkbootstrap.tooltip import ToolTip
@@ -56,7 +55,13 @@ class MainWindow(ttk.Window):
         label.pack(side="left", padx=4, pady=5)
         dropdown = tkinter.OptionMenu(frame, self.maximizeinput, *data.to_printable_list(all_scores))
         dropdown.pack(side="left", padx=4, pady=5)
-
+        frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        frame.pack(pady=5)
+        label = ttk.Label(frame, text="Advanced objective")
+        label.pack(side="left", padx=4, pady=5)
+        self.advancedobjective = ttk.BooleanVar()
+        checkbox = ttk.Checkbutton(frame,variable=self.advancedobjective)
+        checkbox.pack(side="left", padx=4, pady=5)
 
     # Main panel in the middle
     def create_main_panel(self):
