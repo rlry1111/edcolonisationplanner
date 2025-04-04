@@ -1,4 +1,5 @@
 import os
+from platformdirs import user_data_dir
 import sys
 import tkinter
 
@@ -484,7 +485,9 @@ class MainWindow(ttk.Window):
 if __name__ == "__main__":
     pyglet.options['win32_gdi_font'] = True
     if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
-        savefile = os.path.join(sys._MEIPASS, "saved_data.json")
+        data_dir = user_data_dir("edcolonisationplanner", "")
+        os.makedirs(data_dir, exist_ok=True)
+        savefile = os.path.join(data_dir, "saved_data.json")
         font_path = os.path.join(sys._MEIPASS, "eurostile.TTF")
         pyglet.font.add_file(font_path)
     else:
