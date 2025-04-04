@@ -14,7 +14,7 @@ from building_row import BuildingRow
 from scrollable_frame import ScrollableFrame
 from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value
 import solver
-import export
+import extract
 
 #TODO
 #   Add port economy (once Fdev fixes it)
@@ -30,7 +30,7 @@ class MainWindow(ttk.Window):
         self.geometry("1000x1000")
         self.building_input = []
         self.port_order = None
-        self.save_file = export.SaveFile(savefile)
+        self.save_file = extract.SaveFile(savefile)
         w = self.save_file.get_warnings()
         if w:
             print("Warning:", w)

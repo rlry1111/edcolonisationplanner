@@ -41,9 +41,9 @@ class SaveFile:
             result = self.contents[system][plan]
         except KeyError as e:
             self.warnings = f"Unknown system or plan '{e}'"
-        import_into_frame(main_frame, result)
+        insert_into_frame(main_frame, result)
         if with_solution:
-            import_solution_into_frame(main_frame, result)
+            insert_solution_into_frame(main_frame, result)
 
     def save_plan(self, system, plan, main_frame):
         result = extract_from_frame(main_frame)
@@ -167,8 +167,8 @@ def combine_building_constraints(first, second):
     return result
 
 
-# This will ignore the solution, only imports the initial state and constraints
-def import_into_frame(main_frame, result):
+# This will ignore the solution, only inserts the initial state and constraints
+def insert_into_frame(main_frame, result):
     main_frame.clear_all()
 
     main_frame.maximizeinput.set(to_printable(result.get("optimize", "")))
@@ -226,7 +226,7 @@ def import_into_frame(main_frame, result):
 # Uses result["solution"]
 # Assumes that the current state of main_frame is consistent with the rest of the contents of result
 # TODO: if there is a benefit, compute everything from result without relying on main_frame to be consistent
-def import_solution_into_frame(main_frame, result):
+def insert_solution_into_frame(main_frame, result):
     main_frame.clear_result()
     solution = result.get("solution", {})
     to_build = solution.get("to_build", {})
