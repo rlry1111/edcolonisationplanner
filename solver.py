@@ -147,8 +147,8 @@ def solve(main_frame):
             systemscores[score] = pulp.lpSum(getattr(building, score) * all_vars[building_name]
                                              for building_name, building in all_buildings.items())
             if choose_first_station:
-                systemscores[score] += pulp.lpSum(getattr(all_buildings[building_name], score) * var
-                                                 for building_name, var in first_station_vars.items())
+                systemscores[score] += pulp.lpSum(getattr(all_buildings[building_name], score) * (1 + all_buildings[building_name].first_station_offset) * var
+                                                  for building_name, var in first_station_vars.items())
 
     for score in data.compound_scores:
         systemscores[score] = data.compute_compound_score(score, systemscores)

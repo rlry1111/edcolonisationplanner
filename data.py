@@ -11,8 +11,8 @@ def compute_compound_score(score, values):
     if score == "system_score_(beta)":
         return values["security"] + values["tech_level"] + values["wealth"] + values["standard_of_living"]
 
-Building = namedtuple("Building", ['slot'] + base_scores + ['T2points', 'T3points', 'dependencies'],
-                      defaults=(0,)*len(base_scores) + (0, 0, []))
+Building = namedtuple("Building", ['slot'] + base_scores + ['T2points', 'T3points', 'dependencies', 'first_station_offset'],
+                      defaults=(0,)*len(base_scores) + (0, 0, [], 0.0))
 
 all_buildings = {}
 all_categories = defaultdict(list)
@@ -29,16 +29,16 @@ def make_category(category_name, *building_names):
 # Values from Colonization Construction Details (By DaftMav) -- https://docs.google.com/spreadsheets/d/16_hh1G6Tb66OdS01Li0955lITp7yLleb3a8dmqVqq2o/edit?usp=sharing
 
 #            NAME                              SLOT   IP MP SEC TL  W SoL DL  cost   T2    T3
-add_building("Orbis_or_Ocellus",              "space", 5, 1, -3, 6, 7,  5, 8, 209122, 0, "port")
-add_building("Coriolis",                      "space", 1, 0, -2, 1, 2,  3, 2,  53723, "port", 1)
-add_building("Asteroid_Base",                 "space", 1, 0, -1, 3, 5, -4, 7,  53723, "port", 1)
+add_building("Orbis_or_Ocellus",              "space", 5, 1, -3, 6, 7,  5, 8, 209122, 0, "port", first_station_offset=0.20)
+add_building("Coriolis",                      "space", 1, 0, -2, 1, 2,  3, 2,  53723, "port", 1, first_station_offset=0.33)
+add_building("Asteroid_Base",                 "space", 1, 0, -1, 3, 5, -4, 7,  53723, "port", 1, first_station_offset=0.33)
 
-add_building("Commercial_Outpost",            "space", 0, 0, -1, 0, 2,  5, 0,  18988,      1, 0)
-add_building("Industrial_Outpost",            "space", 0, 0,  0, 3, 0,  0, 2,  18988,      1, 0)
-add_building("Criminal_Outpost",              "space", 0, 0, -2, 0, 2,  0, 0,  18988,      1, 0)
-add_building("Civilian_Outpost",              "space", 0, 0, -1, 0, 1,  1, 1,  18988,      1, 0)
-add_building("Scientific_Outpost",            "space", 1, 0,  0, 3, 0,  0, 0,  18988,      1, 0)
-add_building("Military_Outpost",              "space", 1, 0,  2, 0, 0,  0, 0,  18988,      1, 0)
+add_building("Commercial_Outpost",            "space", 0, 0, -1, 0, 2,  5, 0,  18988,      1, 0, first_station_offset=0.1641)
+add_building("Industrial_Outpost",            "space", 0, 0,  0, 3, 0,  0, 2,  18988,      1, 0, first_station_offset=0.1641)
+add_building("Criminal_Outpost",              "space", 0, 0, -2, 0, 2,  0, 0,  18988,      1, 0, first_station_offset=0.1641)
+add_building("Civilian_Outpost",              "space", 0, 0, -1, 0, 1,  1, 1,  18988,      1, 0, first_station_offset=0.1641)
+add_building("Scientific_Outpost",            "space", 1, 0,  0, 3, 0,  0, 0,  18988,      1, 0, first_station_offset=0.1641)
+add_building("Military_Outpost",              "space", 1, 0,  2, 0, 0,  0, 0,  18988,      1, 0, first_station_offset=0.1641)
 
 add_building("Satellite",                     "space", 0, 0,  0, 0, 1,  1, 1,   6721,      1, 0)
 add_building("Communication_Station",         "space", 0, 0,  1, 3, 0,  0, 0,   6721,      1, 0)
@@ -97,7 +97,7 @@ add_building("Large_Tourism_Settlement",  "ground", security=-1, wealth=5, const
 
 # Categories
 make_category("All", *all_buildings.keys())
-make_category("First Station", "Orbis_or_Ocellus", "Coriolis", "Asteroid_Base", "Commercial_Outpost", "Industrial_Outpost", "Criminal_Outpost", "Civilian_Outpost", "Scientific_Outpost", "Military_Outpost")
+make_category("First Station", *(n for n, b in all_buildings.items() if b.first_station_offset > 0))
 make_category("Space", *(n for n, b in all_buildings.items() if b.slot == "space"))
 make_category("Ground", *(n for n, b in all_buildings.items() if b.slot == "ground"))
 make_category("T1", *(n for n, b in all_buildings.items() if b.T2points != "port" and b.T2points > 0))
