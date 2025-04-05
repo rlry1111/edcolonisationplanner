@@ -191,8 +191,10 @@ class SystemState:
     def can_build(self, building_name):
         building = all_buildings[building_name]
         (T2, T3) = self._construction_points(building, 1)
-        if T2 + self.T2points < 0 or T3.self.T3points < 0:
+        if T2 + self.T2points < 0 or T3 + self.T3points < 0:
             return False
+        if not building.dependencies:
+            return True
         return tuple(building.dependencies) not in self.dependencies_locked
 
     def _construction_points(self, building, nb):
