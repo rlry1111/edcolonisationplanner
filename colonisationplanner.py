@@ -344,11 +344,11 @@ class MainWindow(ttk.Window):
         frame = ttk.Frame(self)
         self.system_name_var = ttk.StringVar()
         self.plan_name_var = ttk.StringVar()
-        ttk.Label(frame, text="System Name:").pack(padx=5, pady=5, side="left")
+        ttk.Label(frame, text="System name:").pack(padx=5, pady=5, side="left")
         self.system_name_entry = ttk.Combobox(frame, textvariable=self.system_name_var, width=20,
                                          values=self.save_file.get_system_list())
         self.system_name_entry.pack(padx=5, pady=5, side="left")
-        ttk.Label(frame, text="Plan name").pack(padx=5, pady=5, side="left")
+        ttk.Label(frame, text="Plan name:").pack(padx=5, pady=5, side="left")
         self.plan_name_entry = ttk.Combobox(frame, textvariable=self.plan_name_var, width=20, values=[])
         self.plan_name_entry.pack(padx=5, pady=5, side="left")
 
