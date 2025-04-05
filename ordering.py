@@ -39,8 +39,6 @@ def compute_feasible_order(state, facilities, ports, first_station=None):
         if idx:
             dependency_unlockers.append(elements[idx])
             del elements[idx]
-        else:
-            print("CFO: Could not find unlocker for", dep, "in", elements)
 
     by_tiers = {1: [], 2: []}
     for name in elements:
@@ -76,41 +74,56 @@ def compute_feasible_order(state, facilities, ports, first_station=None):
             continue
         if build_first_from_list(by_tiers[3 - target_tier]):
             continue
-        print("CFO: Remains", total_nb_buildings, dependency_unlockers, ports, by_tiers)
-        print("CFO: State", state.T2points, state.T3points, state.dependencies_locked)
-        t = by_tiers[1][0]
-        bt = data.all_buildings[t]
-        print("CFO: CB", t, state.can_build(t), state._construction_points(bt, 1), bt.dependencies)
         raise RuntimeError("Could not finish ordering")
 
     return result
+
+def get_already_present(result):
+    first_station = result.get("first_station", None)
+    if first_station not in data.all_buildings:
+        first_station = None
+    facilities = result.get("already_present", {})
+    ports_multiple = result.get("already_present.ports", [])
+    ports = []
+    for name, nb in ports_multiple:
+        ports.extend([name] * nb)
+    return facilities, ports, first_station
+
+def get_solution(result):
+    solution = result.get("solution", {})
+    first_station = solution.get("first_station", None)
+    if first_station not in data.all_buildings:
+        first_station = None
+    facilities = solution.get("to_build", {})
+    ports = solution.get("port_order", [])
+    if not ports:
+        for name, nb in facilities.items():
+            if data.is_port(data.all_buildings[name]):
+                ports.extend([name] * nb)
+    facilities = { name: nb for name, nb in facilities.items()
+                   if not data.is_port(data.all_buildings[name]) }
+    return facilities, ports, first_station
 
 def get_ordering_from_result(result, with_solution=True, with_already_present=True):
     ordering = []
     state = data.SystemState()
     if with_already_present:
-        first_station = result.get("first_station", None)
-        if first_station not in data.all_buildings:
-            first_station = None
-        facilities = result.get("already_present", {})
-        ports_multiple = result.get("already_present.ports", [])
-        ports = []
-        for name, nb in ports_multiple:
-            ports.extend([name] * nb)
+        facilities, ports, first_station = get_already_present(result)
         ordering.extend(compute_feasible_order(state, facilities, ports, first_station))
     else:
         state.add_result(result)
 
     if with_solution:
-        solution = result.get("solution", {})
-        first_station = solution.get("first_station", None)
-        if first_station not in data.all_buildings:
-            first_station = None
-        facilities = solution.get("to_build", {})
-        ports = solution.get("port_order", [])
-        if ports:
-            facilities = { name: nb for name, nb in facilities.items()
-                           if not data.is_port(data.all_buildings[name]) }
+        facilities, ports, first_station = get_solution(result)
         ordering.extend(compute_feasible_order(state, facilities, ports, first_station))
 
     return ordering
+
+def get_mixed_ordering_from_result(result):
+    state = data.SystemState()
+    facilities_ap, ports_ap, first_station_ap = get_already_present(result)
+    facilities_sol, ports_sol, first_station_sol = get_solution(result)
+    facilities = Counter(facilities_ap) + Counter(facilities_sol)
+    ports = ports_ap + ports_sol
+    first_station = first_station_ap or first_station_sol
+    return compute_feasible_order(state, facilities, ports, first_station)

@@ -15,6 +15,7 @@ from scrollable_frame import ScrollableFrame
 from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value
 import solver
 import extract
+import export_window
 
 #TODO
 #   Add port economy (once Fdev fixes it)
@@ -307,7 +308,7 @@ class MainWindow(ttk.Window):
             self.T3points_entry.config(state=ttk.NORMAL)
 
 
-    # Action buttons in the middle of the window
+    # Action buttons in the bottom of the window
     def create_action_buttons(self):
         button_frame = ttk.Frame(self)
         solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve)
@@ -316,8 +317,29 @@ class MainWindow(ttk.Window):
         clear_button.pack(padx=5, side="left")
         clear_all_button = ttk.Button(button_frame, text="Clear All Values", command=self.on_clear_all_button, bootstyle="danger")
         clear_all_button.pack(padx=5, side="left")
+        export_button = ttk.Button(button_frame, text="Export Solution", command=self.on_export_button, bootstyle="success")
+        export_button.pack(padx=5, side="left")
         button_frame.pack(pady=7)
 
+    # Handlers for action buttons: "solve" and "clear result"
+    def on_solve(self):
+        res = solver.solve(self)
+        if res and self.building_input[-1].valid:
+            self.add_empty_building_row()
+
+    def on_clear_button(self):
+        self.clear_result()
+        if self.building_input[0].valid:
+            self.add_empty_building_row()
+
+    def on_clear_all_button(self):
+        self.clear_all()
+
+    def on_export_button(self):
+        result = extract.extract_from_frame(self)
+        w = export_window.ExportWindow(self, result)
+
+    # Panel for Save and Reload actions
     def create_import_export_panel(self):
         frame = ttk.Frame(self)
         self.system_name_var = ttk.StringVar()
@@ -338,20 +360,6 @@ class MainWindow(ttk.Window):
         reload_button = ttk.Button(frame, text="Reload", command=self.on_select_plan)
         reload_button.pack(padx=5, side="left")
         frame.pack(pady=7)
-
-    # Handlers for action buttons: "solve" and "clear result"
-    def on_solve(self):
-        res = solver.solve(self)
-        if res and self.building_input[-1].valid:
-            self.add_empty_building_row()
-
-    def on_clear_button(self):
-        self.clear_result()
-        if self.building_input[0].valid:
-            self.add_empty_building_row()
-
-    def on_clear_all_button(self):
-        self.clear_all()
 
     def on_save_button(self):
         system = self.system_name_var.get()
