@@ -168,23 +168,33 @@ def solve(main_frame):
         if maxvalue is not None:
             model.addCons(systemscores[score] <= maxvalue)
 
+
     # Constraints on the construction points
-    portsT2constructionpoints = sum( sum(port_var[k] for name, port_var in port_vars.items()
-                                                       if all_buildings[name].T2points == "port") * max(3, 2*k+1)
-                                            for k in range(max_nb_ports))
-    portsT3constructionpoints = sum( sum(port_var[k] for name, port_var in port_vars.items()
-                                                       if all_buildings[name].T3points == "port") * max(6, 6*k)
-                                            for k in range(max_nb_ports))
+    # Needs to be satisfied for each port, to prevent counting T2 points of last Coriolis station for building the first Ocellus ;)
 
-    finalT2points = sum( building.T2points * all_vars[name]
-                        for name, building in all_buildings.items()
-                        if building.T2points != "port" ) - portsT2constructionpoints + initial_T2points
-    finalT3points = sum( building.T3points * all_vars[name]
-                        for name, building in all_buildings.items()
-                        if building.T3points != "port" ) - portsT3constructionpoints + initial_T3points
+    non_port_T2_cp = sum( building.T2points * all_vars[name]
+                          for name, building in all_buildings.items()
+                          if not data.is_port(building) ) + initial_T2points
+    non_port_T3_cp = sum( building.T3points * all_vars[name]
+                          for name, building in all_buildings.items()
+                          if not data.is_port(building) ) + initial_T3points
 
-    model.addCons(finalT2points >= 0)
-    model.addCons(finalT3points >= 0)
+    for port_idx in range(max_nb_ports):
+        portsT2constructionpoints = sum( sum(port_var[k] for name, port_var in port_vars.items()
+                                             if all_buildings[name].T2points == "port") * max(3, 2*k+1)
+                                         for k in range(port_idx+1))
+        portsT3constructionpoints = sum( sum(port_var[k] for name, port_var in port_vars.items()
+                                             if all_buildings[name].T3points == "port") * max(6, 6*k)
+                                         for k in range(port_idx+1))
+        T3points_from_T2ports = sum( sum(port_var[k] * all_buildings[name].T3points
+                                              for name, port_var in port_vars.items()
+                                              if all_buildings[name].T3points != "port")
+                                          for k in range(port_idx+1))
+        model.addCons(- portsT2constructionpoints + non_port_T2_cp >= 0)
+        model.addCons(T3points_from_T2ports - portsT3constructionpoints + non_port_T3_cp >= 0)
+
+    finalT2points = - portsT2constructionpoints + non_port_T2_cp
+    finalT3points = T3points_from_T2ports - portsT3constructionpoints + non_port_T3_cp
 
     #sort out dependencies for facilities
     indicator_dependency_variables = {}
