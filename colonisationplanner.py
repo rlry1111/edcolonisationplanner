@@ -14,7 +14,9 @@ from building_row import BuildingRow
 from scrollable_frame import ScrollableFrame
 from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value
 import solver
-import export
+import extract
+import export_window
+import import_window
 
 #TODO
 #   Add port economy (once Fdev fixes it)
@@ -30,7 +32,7 @@ class MainWindow(ttk.Window):
         self.geometry("1000x1000")
         self.building_input = []
         self.port_order = None
-        self.save_file = export.SaveFile(savefile)
+        self.save_file = extract.SaveFile(savefile)
         w = self.save_file.get_warnings()
         if w:
             print("Warning:", w)
@@ -307,37 +309,20 @@ class MainWindow(ttk.Window):
             self.T3points_entry.config(state=ttk.NORMAL)
 
 
-    # Action buttons in the middle of the window
+    # Action buttons in the bottom of the window
     def create_action_buttons(self):
         button_frame = ttk.Frame(self)
-        solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve)
+        import_button = ttk.Button(button_frame, text="Import Initial State", command=self.on_import_button, bootstyle="primary")
+        import_button.pack(padx=5, side="left")
+        solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve, bootstyle="success")
         solve_button.pack(padx=5, side="left")
-        clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button)
+        export_button = ttk.Button(button_frame, text="Export Solution", command=self.on_export_button, bootstyle="primary")
+        export_button.pack(padx=5, side="left")
+        clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button, bootstyle="warning")
         clear_button.pack(padx=5, side="left")
         clear_all_button = ttk.Button(button_frame, text="Clear All Values", command=self.on_clear_all_button, bootstyle="danger")
         clear_all_button.pack(padx=5, side="left")
         button_frame.pack(pady=7)
-
-    def create_import_export_panel(self):
-        frame = ttk.Frame(self)
-        self.system_name_var = ttk.StringVar()
-        self.plan_name_var = ttk.StringVar()
-        ttk.Label(frame, text="System Name:").pack(padx=5, pady=5, side="left")
-        self.system_name_entry = ttk.Combobox(frame, textvariable=self.system_name_var, width=20,
-                                         values=self.save_file.get_system_list())
-        self.system_name_entry.pack(padx=5, pady=5, side="left")
-        ttk.Label(frame, text="Plan name").pack(padx=5, pady=5, side="left")
-        self.plan_name_entry = ttk.Combobox(frame, textvariable=self.plan_name_var, width=20, values=[])
-        self.plan_name_entry.pack(padx=5, pady=5, side="left")
-
-        self.system_name_var.trace_add("write", self.on_select_system)
-        self.plan_name_var.trace_add("write", self.on_select_plan)
-
-        save_button = ttk.Button(frame, text="Save", command=self.on_save_button)
-        save_button.pack(padx=5, side="left")
-        reload_button = ttk.Button(frame, text="Reload", command=self.on_select_plan)
-        reload_button.pack(padx=5, side="left")
-        frame.pack(pady=7)
 
     # Handlers for action buttons: "solve" and "clear result"
     def on_solve(self):
@@ -352,6 +337,35 @@ class MainWindow(ttk.Window):
 
     def on_clear_all_button(self):
         self.clear_all()
+
+    def on_export_button(self):
+        result = extract.extract_from_frame(self)
+        w = export_window.ExportWindow(self, result)
+
+    def on_import_button(self):
+        w = import_window.ImportWindow(self)
+
+    # Panel for Save and Reload actions
+    def create_import_export_panel(self):
+        frame = ttk.Frame(self)
+        self.system_name_var = ttk.StringVar()
+        self.plan_name_var = ttk.StringVar()
+        ttk.Label(frame, text="System name:").pack(padx=5, pady=5, side="left")
+        self.system_name_entry = ttk.Combobox(frame, textvariable=self.system_name_var, width=20,
+                                         values=self.save_file.get_system_list())
+        self.system_name_entry.pack(padx=5, pady=5, side="left")
+        ttk.Label(frame, text="Plan name:").pack(padx=5, pady=5, side="left")
+        self.plan_name_entry = ttk.Combobox(frame, textvariable=self.plan_name_var, width=20, values=[])
+        self.plan_name_entry.pack(padx=5, pady=5, side="left")
+
+        self.system_name_var.trace_add("write", self.on_select_system)
+        self.plan_name_var.trace_add("write", self.on_select_plan)
+
+        save_button = ttk.Button(frame, text="Save", command=self.on_save_button)
+        save_button.pack(padx=5, side="left")
+        reload_button = ttk.Button(frame, text="Reload", command=self.on_select_plan)
+        reload_button.pack(padx=5, side="left")
+        frame.pack(pady=7)
 
     def on_save_button(self):
         system = self.system_name_var.get()
@@ -419,6 +433,9 @@ class MainWindow(ttk.Window):
             result_row = self.add_empty_building_row(result_building=data.to_printable(building_name))
         return result_row
 
+    def set_first_station(self, building_name):
+        self.building_input[0].name_var.set(data.to_printable(building_name))
+
     def clear_result(self):
         self.resultlabel.config(text="")
         self.port_order = None
@@ -442,6 +459,16 @@ class MainWindow(ttk.Window):
         for i, row in enumerate(self.building_input):
             row.pack(i+1)
 
+    def clear_already_built(self):
+        for row in self.building_input:
+            row.already_present_var.set(0)
+            if not row.first_station and row.at_least_var.get() == "" and row.at_most_var.get() == "":
+                row.delete()
+        self.building_input = [ row for row in self.building_input
+                                if row.first_station or row.at_least_var.get() != "" or row.at_most_var.get() != "" ]
+        for i, row in enumerate(self.building_input):
+            row.pack(i+1)
+
     def clear_all(self):
         self.clear_result()
         self.maximizeinput.set("")
@@ -456,20 +483,11 @@ class MainWindow(ttk.Window):
         self.add_empty_building_row(firststation=True)
 
     def update_values_from_building_input(self, *args):
-        construction_points = data.ConstructionPointsCounter()
+        state_dict = extract.extract_from_frame(self)
+        state = data.SystemState(state_dict)
         slots = {name: 0 for name in self.available_slots_currently_vars.keys() }
-        for row in self.building_input:
-            if row.valid:
-                building = all_buildings[row.building_name]
-                nb_present = row.already_present
 
-                slots[building.slot] += nb_present
-                if row.building_name == "Asteroid_Base":
-                    slots["asteroid"] += nb_present
-
-                construction_points.add_building(building, nb_present, row.first_station)
-
-        for slot, nb_used in slots.items():
+        for slot, nb_used in state.slots_used.items():
             if self.slot_behavior == "fix_available":
                 avail = get_int_var_value(self.available_slots_currently_vars[slot])
                 self.total_slots_currently_vars[slot].set(avail + nb_used)
@@ -478,9 +496,11 @@ class MainWindow(ttk.Window):
                 self.available_slots_currently_vars[slot].set(total - nb_used)
 
         if self.auto_construction_points.get():
-            self.T2points_variable.set(construction_points.T2points)
-            self.T3points_variable.set(construction_points.T3points)
+            self.T2points_variable.set(state.T2points)
+            self.T3points_variable.set(state.T3points)
 
+        if "Pirate_Base" in state.facilities or "Criminal_Outpost" in state.facilities:
+            self.criminalinput.set(True)
 
 if __name__ == "__main__":
     pyglet.options['win32_gdi_font'] = True
