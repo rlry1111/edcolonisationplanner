@@ -1,9 +1,12 @@
-from pyscipopt import Model
+from pyscipopt import Model, log
 import sys
-import os
+import re
 
 import data
 from data import all_buildings, all_scores, all_categories, all_slots
+
+#big M
+M = 1e6
 
 if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
     pass #I'm pretty sure pyscipopt's library has its solver inside it (I'll have to check later after using pyinstaller)
@@ -15,10 +18,25 @@ def convert_maybe(variable, default=None):
     if value != "": return int(value)
     return default
 
-def solve(main_frame):
-    #requirements
-    M = 10000
+def process_expression(expression):
+    expression = expression.replace('ln(', 'log(')
+    expression = expression.replace('^', '**')
+    expression = expression.replace(' ', '')
+    substitutions = {
+        'i': 'systemscores["initial_population_increase"]',
+        'm': 'systemscores["max_population_increase"]',
+        'e': 'systemscores["security"]',
+        't': 'systemscores["tech_level"]',
+        'w': 'systemscores["wealth"]',
+        'n': 'systemscores["standard_of_living"]',
+        'd': 'systemscores["development_level"]',
+        'c': 'systemscores["construction_cost"]'
+    }
+    pattern = r'([i,m,e,t,w,n,d,c])'
+    expression = re.sub(pattern, lambda match: substitutions[match.group(0)], expression)
+    return expression
 
+def solve(main_frame):
     # Get data from the Entry widgets
     orbitalfacilityslots = main_frame.available_slots_currently_vars["space"].get()
     groundfacilityslots = main_frame.available_slots_currently_vars["ground"].get()
