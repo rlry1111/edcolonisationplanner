@@ -43,6 +43,7 @@ class ExportWindow(tkinter.Toplevel):
         self.clipboard_clear()
         self.clipboard_append(contents)
         self.daftmav_button.config(text="Done!", bootstyle="success")
+        self.destroy()
 
     def create_layout(self):
         options_frame = ttk.LabelFrame(self, text="Options", padding=2)

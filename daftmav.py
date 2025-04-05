@@ -74,3 +74,31 @@ def from_edcp_to_daftmav(name):
 def export_ordering(ordering):
     ordering = [ from_edcp_to_daftmav(line) for line in ordering ]
     return "\n".join(ordering)
+
+def import_state(main_frame, text, with_system_name=False):
+    lines = text.splitlines()
+    for l in lines:
+        l = l.strip()
+    lines = [ l for l in lines if l != "" ]
+    try:
+        starting_point = 1 + lines.index("Construction")
+    except ValueError:
+        starting_point = 0
+    try:
+        converted = [ from_daftmav_to_edcp(line)
+                      for line in lines[starting_point:] ]
+    except KeyError as e:
+        return f"Error: facility '{e}' unknown"
+    if not converted:
+        return "Error: no facilities found. Make sure you include the whole column"
+    first_station = converted[0]
+    facilities = Counter(converted[1:])
+    if starting_point > 3 and with_system_name:
+        main_frame.system_name_var.set(lines[starting_point-4])
+    main_frame.clear_result()
+    main_frame.choose_first_station_var.set(False)
+    main_frame.clear_already_built()
+    main_frame.set_first_station(first_station)
+    for name, nb in facilities.items():
+        row = main_frame.get_row_for_building(name, include_first_station=False)
+        row.already_present_var.set(nb)
