@@ -456,20 +456,11 @@ class MainWindow(ttk.Window):
         self.add_empty_building_row(firststation=True)
 
     def update_values_from_building_input(self, *args):
-        construction_points = data.ConstructionPointsCounter()
+        state_dict = extract.extract_from_frame(self)
+        state = data.SystemState(state_dict)
         slots = {name: 0 for name in self.available_slots_currently_vars.keys() }
-        for row in self.building_input:
-            if row.valid:
-                building = all_buildings[row.building_name]
-                nb_present = row.already_present
 
-                slots[building.slot] += nb_present
-                if row.building_name == "Asteroid_Base":
-                    slots["asteroid"] += nb_present
-
-                construction_points.add_building(building, nb_present, row.first_station)
-
-        for slot, nb_used in slots.items():
+        for slot, nb_used in state.slots_used.items():
             if self.slot_behavior == "fix_available":
                 avail = get_int_var_value(self.available_slots_currently_vars[slot])
                 self.total_slots_currently_vars[slot].set(avail + nb_used)
@@ -478,8 +469,8 @@ class MainWindow(ttk.Window):
                 self.available_slots_currently_vars[slot].set(total - nb_used)
 
         if self.auto_construction_points.get():
-            self.T2points_variable.set(construction_points.T2points)
-            self.T3points_variable.set(construction_points.T3points)
+            self.T2points_variable.set(state.T2points)
+            self.T3points_variable.set(state.T3points)
 
 
 if __name__ == "__main__":

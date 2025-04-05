@@ -1,4 +1,5 @@
 from collections import namedtuple, defaultdict
+import copy
 
 base_scores = ["initial_population_increase", "max_population_increase", "security", "tech_level", "wealth", "standard_of_living", "development_level", "construction_cost"]
 compound_scores = [ "system_score_(beta)" ]
@@ -111,6 +112,8 @@ make_category("Medium Settlement", *(n for n in all_buildings.keys() if n.endswi
 make_category("Large Settlement", *(n for n in all_buildings.keys() if n.endswith("Settlement") and n.startswith("Large")))
 
 
+# Utilities to compute scores and construction points
+
 def is_port(building):
     return building.T2points == "port" or building.T3points == "port"
 
@@ -120,30 +123,119 @@ def get_T2port_cost(nb_previous_ports):
 def get_T3port_cost(nb_previous_ports):
     return max(6, 6*nb_previous_ports)
 
-class ConstructionPointsCounter:
-    def __init__(self, nb_previous_ports=0):
+all_dependencies = set( tuple(building.dependencies) for building in all_buildings.values()
+                        if building.dependencies )
+
+class SystemState:
+    def __init__(self, starting_point={}):
         self.T2points = 0
         self.T3points = 0
-        self.nb_previous_ports = nb_previous_ports
+        self.scores = { score: 0 for score in all_scores }
+        self.facilities = defaultdict(int)
+        self.ports = []
+        self.slots_used = { slot: 0 for slot in all_slots }
+        self.first_station = None
+        self.dependencies_locked = set(all_dependencies)
+        if starting_point:
+            self.add_result(starting_point)
 
-    def add_building(self, building, nb=1, first_station=False):
-        if first_station and (building.T2points != "port" and building.T2points > 0):
+    def copy(self):
+        return copy.copy(self)
+
+    def add_result(self, result):
+        if "first_station" in result and result["first_station"] in all_buildings:
+            self.add_first_station(result["first_station"])
+        for name, nb in result.get("already_present", {}).items():
+            self.add_building(name, nb)
+        for name, nb in result.get("already_present.ports", []):
+            self.add_building(name, nb)
+        return self
+
+    def add_solution(self, result):
+        solution = result.get("solution", {})
+        if "first_station" in solution and solution["first_station"] in all_buildings:
+            self.add_first_station(solution["first_station"])
+            port_order = solution.get("port_order", [])
+        for name, nb in solution.get("to_build", {}).items():
+            if port_order and not is_port(all_buildings[name]):
+                self.add_building(name, nb)
+        for name in port_order:
+            self.add_building(name, 1)
+        return self
+
+    def add_first_station(self, building_name):
+        building = all_buildings[building_name]
+        assert self.first_station is None
+        if building.T2points != "port" and building.T2points > 0:
             self.T2points += building.T2points
-        if first_station and (building.T3points != "port" and building.T3points > 0):
+        if building.T3points != "port" and building.T3points > 0:
             self.T3points += building.T3points
-        if not first_station:
-            if building.T2points == "port":
-                for _ in range(nb):
-                    self.T2points -= get_T2port_cost(self.nb_previous_ports)
-                    self.nb_previous_ports += 1
-            else:
-                self.T2points += nb * building.T2points
-        if building.T3points == "port":
-            for _ in range(nb):
-                self.T3points -= get_T3port_cost(self.nb_previous_ports)
-                self.nb_previous_ports += 1
+        self._update_scores(building, 1)
+        self._update_dependencies(building_name)
+        self.first_station = building_name
+        return self
+
+    def add_building(self, building_name, nb):
+        building = all_buildings[building_name]
+        T2, T3 = self._construction_points(building, nb)
+        self.T2points += T2
+        self.T3points += T3
+        if is_port(building):
+            self.ports.extend([building_name] * nb)
+        self.facilities[building_name] += nb
+        self._update_scores(building, nb)
+        self._update_dependencies(building_name)
+        self._update_slots(building_name, building, nb)
+        return self
+
+    def can_build(self, building_name):
+        building = all_buildings[building_name]
+        (T2, T3) = self._construction_points(building, 1)
+        if T2 + self.T2points < 0 or T3.self.T3points < 0:
+            return False
+        return tuple(building.dependencies) not in self.dependencies_locked
+
+    def _construction_points(self, building, nb):
+        nb_ports = len(self.ports)
+        if building.T2points == "port":
+            T2 = 0
+            for i in range(nb):
+                T2 -= get_T2port_cost(nb_ports + i)
         else:
-            self.T3points += nb * building.T3points
+            T2 = nb * building.T2points
+        if building.T3points == "port":
+            T3 = 0
+            for i in range(nb):
+                T3 -= get_T3port_cost(nb_ports + i)
+        else:
+            T3 = nb * building.T3points
+        return (T2, T3)
+
+    def _update_scores(self, building, nb):
+        for score in base_scores:
+            self.scores[score] += getattr(building, score) * nb
+        for score in compound_scores:
+            self.scores[score] += compute_compound_score(score, self.scores)
+
+    def _update_dependencies(self, building_name):
+        new_deps = set( dep for dep in self.dependencies_locked
+                        if building_name not in dep )
+        self.dependencies_locked = new_deps
+
+    def _update_slots(self, building_name, building, nb):
+        self.slots_used[building.slot] += nb
+        if building_name == "Asteroid_Base":
+            self.slots_used["asteroid"] += nb
+
+def combine_solutions(*solutions):
+    result = sum((Counter(solution) for solution in solutions), Counter())
+    return dict(result)
+
+def count_ports_from_port_list(port_order):
+    result = Counter()
+    for name, value in port_order:
+        result[name] += value
+    return dict(result)
 
 def to_printable(name):
     return name.replace("_", " ")

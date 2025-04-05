@@ -1,5 +1,5 @@
 import json
-from data import all_slots, all_scores, all_buildings, from_printable, to_printable, compute_all_scores, is_port, ConstructionPointsCounter
+from data import all_slots, all_scores, all_buildings, from_printable, to_printable, compute_all_scores, is_port, SystemState
 from tksetup import get_int_var_value
 from collections import defaultdict, Counter
 
@@ -227,12 +227,22 @@ def insert_into_frame(main_frame, result):
 # Assumes that the current state of main_frame is consistent with the rest of the contents of result
 # TODO: if there is a benefit, compute everything from result without relying on main_frame to be consistent
 def insert_solution_into_frame(main_frame, result):
-    main_frame.clear_result()
     solution = result.get("solution", {})
     to_build = solution.get("to_build", {})
-    first_station_name = solution.get("first_station", None)
     if not to_build and not first_station_name:
         return
+    main_frame.clear_result()
+
+    state = SystemState(result)
+    initial_construction_cost = state.scores["construction_cost"]
+    mcp = result.get("manual_construction_points", {})
+    if mcp:
+        state.T2points = mcp.get("T2", state.T2points)
+        state.T3points = mcp.get("T3", state.T3points)
+
+    state.add_solution(result)
+    state.scores["construction_cost"] -= initial_construction_cost
+
     for building_name, nb in to_build.items():
         result_row = main_frame.get_row_for_building(building_name)
         result_row.set_build_result(nb)
@@ -241,62 +251,23 @@ def insert_solution_into_frame(main_frame, result):
     if port_order:
         main_frame.set_port_ordering(port_order)
 
-    # Need to combine solution with already present buildings to compute total scores
-    already_present = result.get("already_present", {})
-    port_order = result.get("already_present.ports", [])
-    first_station = {}
-    if first_station_name:
-        first_station = {first_station_name: 1}
-    elif result["first_station"]:
-        first_station = {result["first_station"]: 1}
-    already_present = combine_solutions(already_present, first_station,
-                                        count_ports_from_port_order(port_order))
-    complete_system = combine_solutions(to_build, already_present)
-
-    # Compute scores, except for construction cost which does not count already present buildings
-    scores = compute_all_scores(complete_system)
-    partial_scores = compute_all_scores(to_build)
-    scores["construction_cost"] = partial_scores["construction_cost"]
-    for score, value in scores.items():
+    for score, value in state.scores.items():
         main_frame.resultvars[score].set(value)
 
     # Count available slots
     for slot in all_slots:
-        available = main_frame.available_slots_currently_vars[slot].get()
-        if slot == "asteroid":
-            used = to_build.get("Asteroid_Base", 0)
-        else:
-            used = sum(nb_built for building_name, nb_built in to_build.items()
-                       if all_buildings[building_name].slot == slot)
-        main_frame.available_slots_after_vars[slot].set(available - used)
+        total = main_frame.total_slots_currently_vars[slot].get()
+        used = state.slots_used[slot]
+        main_frame.available_slots_after_vars[slot].set(total - used)
 
     # Count construction points.
-    nb_ports_already_present = sum(is_port(all_buildings[name]) * nb
-                                   for name, nb in result.get("already_present", {}).items())
-    construction_points = ConstructionPointsCounter(nb_ports_already_present)
-    construction_points.T2points = main_frame.T2points_variable.get()
-    construction_points.T3points = main_frame.T3points_variable.get()
-    if first_station_name:
-        construction_points.add_building(all_buildings[first_station_name], 1, first_station=True)
-    for name, nb in to_build.items():
-        construction_points.add_building(all_buildings[name], nb)
-    main_frame.T2points_variable_after.set(construction_points.T2points)
-    main_frame.T3points_variable_after.set(construction_points.T3points)
+    main_frame.T2points_variable_after.set(state.T2points)
+    main_frame.T3points_variable_after.set(state.T3points)
 
     # Set First Station if it is specified
-    if first_station_name:
-        main_frame.building_input[0].name_var.set(to_printable(first_station_name))
+    if state.first_station:
+        main_frame.building_input[0].name_var.set(to_printable(state.first_station))
         main_frame.building_input[0].set_build_result(1)
 
     if main_frame.building_input[-1].valid:
         main_frame.add_empty_building_row()
-
-def combine_solutions(*solutions):
-    result = sum((Counter(solution) for solution in solutions), Counter())
-    return dict(result)
-
-def count_ports_from_port_order(port_order):
-    result = Counter()
-    for name, value in port_order:
-        result[name] += value
-    return dict(result)
