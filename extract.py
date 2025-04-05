@@ -229,8 +229,6 @@ def insert_into_frame(main_frame, result):
 def insert_solution_into_frame(main_frame, result):
     solution = result.get("solution", {})
     to_build = solution.get("to_build", {})
-    if not to_build and not first_station_name:
-        return
     main_frame.clear_result()
 
     state = SystemState(result)

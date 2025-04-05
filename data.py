@@ -155,7 +155,7 @@ class SystemState:
         solution = result.get("solution", {})
         if "first_station" in solution and solution["first_station"] in all_buildings:
             self.add_first_station(solution["first_station"])
-            port_order = solution.get("port_order", [])
+        port_order = solution.get("port_order", [])
         for name, nb in solution.get("to_build", {}).items():
             if port_order and not is_port(all_buildings[name]):
                 self.add_building(name, nb)
