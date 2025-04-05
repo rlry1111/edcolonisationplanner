@@ -92,7 +92,12 @@ def import_state(main_frame, text, with_system_name=False):
     if not converted:
         return "Error: no facilities found. Make sure you include the whole column"
     first_station = converted[0]
-    facilities = Counter(converted[1:])
+    facilities = [ name for name in converted[1:]
+                   if not data.is_port(data.all_buildings[name]) ]
+    facilities = Counter(facilities)
+    ports = [ name for name in converted[1:]
+              if data.is_port(data.all_buildings[name]) ]
+
     if starting_point > 3 and with_system_name:
         main_frame.system_name_var.set(lines[starting_point-4])
     main_frame.clear_result()
@@ -102,3 +107,7 @@ def import_state(main_frame, text, with_system_name=False):
     for name, nb in facilities.items():
         row = main_frame.get_row_for_building(name, include_first_station=False)
         row.already_present_var.set(nb)
+    for name in ports:
+        row = main_frame.add_empty_building_row(result_building=data.to_printable(name))
+        row.already_present_var.set(1)
+
