@@ -66,8 +66,8 @@ class MainWindow(ttk.Window):
         canvas.create_oval(10, 10, 30, 30, fill="lightblue")
         canvas.create_text(20, 20, text="?", font=("arial", 8, "bold"))
         directionframe = ttk.Frame(advancedframe)
-        self.direction = ttk.BooleanVar
-        directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction, bootstyle="round-toggle", state='disabled')
+        self.direction_input = ttk.BooleanVar()
+        directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input, bootstyle="round-toggle", state='disabled')
         self.objectiveinput = ttk.StringVar()
         entry = ttk.Entry(advancedframe, textvariable=self.objectiveinput, width=40)
         pretext = "Enter your custom objective function here..."
@@ -75,7 +75,7 @@ class MainWindow(ttk.Window):
         entry.bind("<FocusIn>", lambda event: entry.delete(0, "end") if entry.get() == pretext else None)
         entry.bind("<FocusOut>", lambda event: entry.insert(0, pretext) if not entry.get() else None)
         entry.config(state='disabled')
-        ToolTip(canvas, text="Set your own custom objective function.\nThe objective function is what the program tries to maximize/minimize (depending on what you select).\nSupported operators:\n+, -, /, *, ^, ln() (natural logarithm), abs() (absolute value)\n(abs(x) = x if x >= 0, -x if x < 0)\n\nIf brackets are not present, standard order of operations will be followed.\nBrackets after the ln/sgn are required, for the program to recognize what to take the logarithm or sign of.\nSpaces can be placed anywhere.\n\nUse letters to represent the system scores:\ni: Initial population increase\nm: Maximum population increase\ne: Security\nt: Tech level\nw: Wealth\nn: Standard of living\nd: Development level\nc: Construction cost\n\nExample inputs:\nw*t^2 maximizes/minimizes wealth * (tech level squared)\n(d + ln(n^ w))/c maximizes/minimizes (development level + ln(standard of living ^ wealth)) / construction cost")
+        ToolTip(canvas, text="Set your own custom objective function.\nThe objective function is what the program tries to maximize/minimize (depending on what you select).\nSupported operators:\n+, -, /, *, ^, ln() (natural logarithm), abs() (absolute value)\n(abs(x) = x if x >= 0, -x if x < 0)\n\nIf brackets are not present, standard order of operations will be followed.\nBrackets after the ln/sgn are required, for the program to recognize what to take the logarithm or sign of.\nSpaces can be placed anywhere.\nType numbers normally.\n\nUse letters to represent the system scores:\ni: Initial population increase\nm: Maximum population increase\ne: Security\nt: Tech level\nw: Wealth\nn: Standard of living\nd: Development level\nc: Construction cost\n\nExample inputs:\nw*t^2 maximizes/minimizes wealth * (tech level squared)\n(-15*d + ln(n^ w))/c maximizes/minimizes (-15 * development level + ln(standard of living ^ wealth)) / construction cost")
         checkbox = ttk.Checkbutton(frame2, text="Advanced objective", variable=self.advancedobjective, command=lambda: (dropdown.config(state='disabled'), directionswitch.config(state='normal'), entry.config(state='normal')) if self.advancedobjective.get() else (dropdown.config(state='normal'), directionswitch.config(state='disabled'), entry.config(state='disabled')))
         advancedframe.config(labelwidget=checkbox)
         advancedframe.pack(side="left", padx=4, pady=5)

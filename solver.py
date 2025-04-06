@@ -51,11 +51,14 @@ def solve(main_frame):
         return None
 
     nb_ports_already_present = sum(row.already_present for row in main_frame.building_input if row.is_port)
-    max_nb_ports = orbitalfacilityslots + groundfacilityslots + nb_ports_already_present
+    max_nb_ports = 20 + nb_ports_already_present
 
     #problem
     model = Model('NON-LINEAR')
-    direction = 'minimize' if maximize == "construction_cost" else 'maximize'
+    if main_frame.advancedobjective.get():
+        direction = 'maximize' if main_frame.direction_input.get() else 'minimize'
+    else:
+        direction = 'minimize' if maximize == "construction_cost" else 'maximize'
     objective = model.addVar("objective", vtype="C")
 
     #create all the variables for each of the facilities
@@ -158,24 +161,29 @@ def solve(main_frame):
     for score in data.base_scores:
         if score != "construction_cost":
             systemscores[score] = sum(getattr(building, score) * all_values[building_name]
-                                             for building_name, building in all_buildings.items())
+                                             for building_name, building in all_buildings.items() if getattr(building, score) != 0)
         else:
             # Do not count already present buildings for construction cost, but count the chosen first station
             systemscores[score] = sum(getattr(building, score) * all_vars[building_name]
-                                             for building_name, building in all_buildings.items())
+                                             for building_name, building in all_buildings.items() if getattr(building, score) != 0)
             if choose_first_station:
                 systemscores[score] += sum(getattr(all_buildings[building_name], score) * (1 + all_buildings[building_name].first_station_offset) * var
-                                                  for building_name, var in first_station_vars.items())
+                                                  for building_name, var in first_station_vars.items() if getattr(all_buildings[building_name], score) != 0)
 
     for score in data.compound_scores:
         systemscores[score] = data.compute_compound_score(score, systemscores)
 
     # Objective function
-    if maximize in systemscores:
-        model.addCons(systemscores[maximize] == objective)
+    if main_frame.advancedobjective.get():
+        model.setParam("limits/time", 600)
+        #security risk
+        exec("model.addCons(" + process_expression(main_frame.objectiveinput.get()) + " == objective)")
     else:
-        main_frame.print_result(f"Error: One or more inputs are blank: select an objective to optimize")
-        return False
+        if maximize in systemscores:
+            model.addCons(systemscores[maximize] == objective)
+        else:
+            main_frame.print_result(f"Error: One or more inputs are blank: select an objective to optimize")
+            return False
 
     # Constraints on minimum and maximum scores
     for score in all_scores:
@@ -230,6 +238,7 @@ def solve(main_frame):
 
     # Solve the problem
     model.setObjective(objective, sense=direction)
+    model.setParam('display/verblevel', 5)
     model.optimize()
     sol = model.getBestSol()
     if model.getStatus() == "infeasible":
