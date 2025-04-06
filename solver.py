@@ -1,4 +1,5 @@
-from pyscipopt import Model, log
+from pyscipopt import Model
+import pyscipopt
 import sys
 import re
 
@@ -19,21 +20,8 @@ def convert_maybe(variable, default=None):
     return default
 
 def process_expression(expression):
-    expression = expression.replace('ln(', 'log(')
     expression = expression.replace('^', '**')
     expression = expression.replace(' ', '')
-    substitutions = {
-        'i': 'systemscores["initial_population_increase"]',
-        'm': 'systemscores["max_population_increase"]',
-        'e': 'systemscores["security"]',
-        't': 'systemscores["tech_level"]',
-        'w': 'systemscores["wealth"]',
-        'n': 'systemscores["standard_of_living"]',
-        'd': 'systemscores["development_level"]',
-        'c': 'systemscores["construction_cost"]'
-    }
-    pattern = r'([i,m,e,t,w,n,d,c])'
-    expression = re.sub(pattern, lambda match: substitutions[match.group(0)], expression)
     return expression
 
 def solve(main_frame):
@@ -59,7 +47,7 @@ def solve(main_frame):
         direction = 'maximize' if main_frame.direction_input.get() else 'minimize'
     else:
         direction = 'minimize' if maximize == "construction_cost" else 'maximize'
-    objective = model.addVar("objective", vtype="C")
+    objective_var = model.addVar("objective", vtype="C", lb=None)
 
     #create all the variables for each of the facilities
     all_vars = {} # for each building name, the variables that decide how many will be BUILT
@@ -173,17 +161,49 @@ def solve(main_frame):
     for score in data.compound_scores:
         systemscores[score] = data.compute_compound_score(score, systemscores)
 
+
+    def eval_objective(to_eval):
+        restricted_globals = {}
+        restricted_builtins = {}
+        restricted_globals["__builtins__"] = restricted_builtins
+        restricted_builtins["abs"] = abs
+        restricted_builtins["pow"] = pow
+        restricted_builtins["sum"] = sum
+        restricted_globals["log"] = pyscipopt.log
+        restricted_globals["ln"] = pyscipopt.log
+        restricted_globals["sqrt"] = pyscipopt.sqrt
+        restricted_globals["exp"] = pyscipopt.exp
+        restricted_locals = {}
+        restricted_locals.update({
+            'i': systemscores["initial_population_increase"],
+            'm': systemscores["max_population_increase"],
+            'e': systemscores["security"],
+            't': systemscores["tech_level"],
+            'w': systemscores["wealth"],
+            'n': systemscores["standard_of_living"],
+            'd': systemscores["development_level"],
+            'c': systemscores["construction_cost"]
+        })
+        return eval(to_eval, restricted_globals, restricted_locals)
+
     # Objective function
     if main_frame.advancedobjective.get():
         model.setParam("limits/time", 600)
+        processed_expression = process_expression(main_frame.objectiveinput.get())
         #security risk
-        exec("model.addCons(" + process_expression(main_frame.objectiveinput.get()) + " == objective)")
+        try:
+            objective = eval_objective(processed_expression)
+        except Exception as e:
+            main_frame.print_result(f"Error when computing objective: {e}")
+            return False
     else:
         if maximize in systemscores:
-            model.addCons(systemscores[maximize] == objective)
+            objective = systemscores[maximize]
+
         else:
             main_frame.print_result(f"Error: One or more inputs are blank: select an objective to optimize")
             return False
+    model.addCons(objective == objective_var)
 
     # Constraints on minimum and maximum scores
     for score in all_scores:
@@ -237,7 +257,7 @@ def solve(main_frame):
             model.addCons(all_values[target_name] <= M * indicator_dependency_variables[deps])
 
     # Solve the problem
-    model.setObjective(objective, sense=direction)
+    model.setObjective(objective_var, sense=direction)
     model.setParam('display/verblevel', 5)
     model.optimize()
     sol = model.getBestSol()
