@@ -558,6 +558,8 @@ class MainWindow(ttk.Window):
         if self.auto_construction_points.get():
             self.T2points_variable.set(construction_points.T2points)
             self.T3points_variable.set(construction_points.T3points)
+    def to_dict(self):
+        return {key: value for key, value in self.__dict__.items()}
 
 
 if __name__ == "__main__":
