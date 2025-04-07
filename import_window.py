@@ -66,3 +66,5 @@ class ImportWindow(tkinter.Toplevel):
         self.message_label = ttk.Label(self, text="", bootstyle="danger")
         self.message_label.pack(padx=2, pady=5, side="top")
 
+        ToolTip(self.daftmav_text_entry, "Copy the contents of column 'D' in a Colony tab, and paste here")
+        ToolTip(self.scuffed_text_entry, "Use the tool 'export' link at the top right, copy the contents of the text box, and paste here")

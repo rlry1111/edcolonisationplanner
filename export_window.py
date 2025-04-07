@@ -2,7 +2,7 @@ import tkinter
 import ttkbootstrap as ttk
 from tkinter.scrolledtext import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
-from ttkbootstrap import filedialog
+from tkinter import filedialog
 
 import extract
 import ordering
@@ -129,3 +129,5 @@ class ExportWindow(tkinter.Toplevel):
         self.include_initial_state_var.trace_add("write", self.update_text)
         self.not_mix_var.trace_add("write", self.update_text)
 
+        ToolTip(daftmav_button, "Click me, then paste in column 'D' in a Colony tab.\n If you selected 'include initial state', paste in the row of the first station, otherwise in the first empty row.")
+        ToolTip(scuffed_button_file, "Save in a file, then use the tool 'import' link at the top right to choose the saved file.")
