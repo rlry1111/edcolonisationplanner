@@ -12,13 +12,17 @@ import data
 from data import all_buildings, all_scores, all_categories, all_slots
 from building_row import BuildingRow
 from scrollable_frame import ScrollableFrame
-from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value
+from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value, HelpIndicator
 import solver
 import export
 
 #TODO
 #   Add port economy (once Fdev fixes it)
 #   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
+#     * include in save/load
+#     * provide examples? drop-down list of presets?
+#     * NEED a threaded solve execution with something that shows progress
+#   Use the "?" canvas in other places
 
 # Main window
 class MainWindow(ttk.Window):
@@ -50,45 +54,63 @@ class MainWindow(ttk.Window):
     # Dropdown menu at the top for choosing what to optimize
     def create_optimization_criterion_choice(self):
         self.maximizeinput = ttk.StringVar()
-        frame = ttk.Frame(self.scroll_frame.scrollable_frame)
-        frame.pack(pady=5)
-        label = ttk.Label(frame, text="Select what you are trying to maximize (except for construction cost which is minimized):")
+        basic_obj_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        basic_obj_frame.pack(pady=5)
+        label = ttk.Label(basic_obj_frame, text="Select what you are trying to maximize (except for construction cost which is minimized):")
         label.pack(side="left", padx=4, pady=5)
-        dropdown = tkinter.OptionMenu(frame, self.maximizeinput, *data.to_printable_list(all_scores))
+        dropdown = tkinter.OptionMenu(basic_obj_frame, self.maximizeinput, *data.to_printable_list(all_scores))
         dropdown.pack(side="left", padx=4, pady=5)
-        frame = ttk.Frame(self.scroll_frame.scrollable_frame)
-        frame.pack(pady=5)
+
         self.advancedobjective = ttk.BooleanVar()
-        frame2 = ttk.Frame(self.scroll_frame.scrollable_frame)
-        frame2.pack()
-        advancedframe = ttk.LabelFrame(frame2, text="", padding=2)
-        canvas = tkinter.Canvas(frame2, width=33, height=33, bg='darkgrey')
-        canvas.pack(side="right", padx=4, pady=5)
-        canvas.create_oval(10, 10, 30, 30, fill="lightblue")
-        canvas.create_text(20, 20, text="?", font=("arial", 8, "bold"))
-        directionframe = ttk.Frame(advancedframe)
         self.direction_input = ttk.BooleanVar()
-        directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input, bootstyle="round-toggle", state='disabled')
         self.objectiveinput = ttk.StringVar()
+        containing_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        containing_frame.pack(pady=5)
+        advancedframe = ttk.LabelFrame(containing_frame, text="", padding=2)
+
+        help_text = "Set your own custom objective function.\nThe objective function is what the program tries to maximize/minimize (depending on what you select).\nSupported operators:\n+, -, /, *, ^, ln() (natural logarithm), abs() (absolute value), sqrt(), pow(), exp()\n(abs(x) = x if x >= 0, -x if x < 0)\n\nIf brackets are not present, standard order of operations will be followed.\nBrackets after the ln/sgn are required, for the program to recognize what to take the logarithm or sign of.\nSpaces can be placed anywhere.\nType numbers normally.\n\nUse letters to represent the system scores:\ni: Initial population increase\nm: Maximum population increase\ne: Security\nt: Tech level\nw: Wealth\nn: Standard of living\nd: Development level\nc: Construction cost\n\nExample inputs:\nw*t^2 maximizes/minimizes wealth * (tech level squared)\n(-15*d + ln(n^ w))/c maximizes/minimizes (-15 * development level + ln(standard of living ^ wealth)) / construction cost"
+        helper = HelpIndicator(advancedframe, help_text)
+        helper.pack(side="right", padx=4, pady=5)
+
+        directionframe = ttk.Frame(advancedframe)
+        directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input,
+                                          bootstyle="round-toggle", state='disabled')
         entry = ttk.Entry(advancedframe, textvariable=self.objectiveinput, width=40)
         pretext = "Enter your custom objective function here..."
         entry.insert(0, pretext)
         entry.bind("<FocusIn>", lambda event: entry.delete(0, "end") if entry.get() == pretext else None)
         entry.bind("<FocusOut>", lambda event: entry.insert(0, pretext) if not entry.get() else None)
         entry.config(state='disabled')
-        ToolTip(canvas, text="Set your own custom objective function.\nThe objective function is what the program tries to maximize/minimize (depending on what you select).\nSupported operators:\n+, -, /, *, ^, ln() (natural logarithm), abs() (absolute value)\n(abs(x) = x if x >= 0, -x if x < 0)\n\nIf brackets are not present, standard order of operations will be followed.\nBrackets after the ln/sgn are required, for the program to recognize what to take the logarithm or sign of.\nSpaces can be placed anywhere.\nType numbers normally.\n\nUse letters to represent the system scores:\ni: Initial population increase\nm: Maximum population increase\ne: Security\nt: Tech level\nw: Wealth\nn: Standard of living\nd: Development level\nc: Construction cost\n\nExample inputs:\nw*t^2 maximizes/minimizes wealth * (tech level squared)\n(-15*d + ln(n^ w))/c maximizes/minimizes (-15 * development level + ln(standard of living ^ wealth)) / construction cost")
-        checkbox = ttk.Checkbutton(frame2, text="Advanced objective", variable=self.advancedobjective, command=lambda: (dropdown.config(state='disabled'), directionswitch.config(state='normal'), entry.config(state='normal')) if self.advancedobjective.get() else (dropdown.config(state='normal'), directionswitch.config(state='disabled'), entry.config(state='disabled')))
+        ToolTip(entry, help_text)
+
+        def on_choose_advanced_objective():
+            if self.advancedobjective.get():
+                dropdown.config(state='disabled')
+                directionswitch.config(state='normal')
+                entry.config(state='normal')
+            else:
+                dropdown.config(state='normal')
+                directionswitch.config(state='disabled')
+                entry.config(state='disabled')
+        checkbox = ttk.Checkbutton(containing_frame, text="Advanced objective", variable=self.advancedobjective,
+                                   command=on_choose_advanced_objective)
         advancedframe.config(labelwidget=checkbox)
         advancedframe.pack(side="left", padx=4, pady=5)
         self.scroll_frame.scrollable_frame.update_idletasks()
-        directionframe.pack()
+        directionframe.pack(side="left")
         label = ttk.Label(directionframe, text="Minimize")
         label.pack(side="left", padx=3, pady=5)
         ToolTip(directionswitch, text="Turn on to maximize the objective function and turn off to minimize it")
         directionswitch.pack(side="left", padx=3, pady=5)
         label = ttk.Label(directionframe, text="Maximize")
         label.pack(side="left", pady=5)
-        entry.pack(padx=4, pady=5)
+        entry.pack(padx=4, pady=5, side="left")
+
+        self.adv_solution_value_var = ttk.DoubleVar()
+        self.adv_solution_value = ttk.Entry(advancedframe, textvariable=self.adv_solution_value_var,
+                                            state="readonly", width=7)
+        ttk.Label(advancedframe, text="Solution value:").pack(padx=4, pady=5, side="left")
+        self.adv_solution_value.pack(padx=4, pady=5, side="left")
 
     # Main panel in the middle
     def create_main_panel(self):

@@ -1,5 +1,6 @@
 import tkinter
 import ttkbootstrap as ttk
+from ttkbootstrap.tooltip import ToolTip
 
 
 # tkinter setup
@@ -70,3 +71,12 @@ def remove_widgets_from_frame(frame, widget_classes=None, widget_names=None):
         if (widget_classes and child.winfo_class() in widget_classes) or \
            (widget_names and child.winfo_name() in widget_names):
             child.destroy()
+
+
+class HelpIndicator(tkinter.Canvas):
+    def __init__(self, parent, text, icon_text="?"):
+        super().__init__(parent, width=33, height=33, bg='darkgrey')
+        self.create_oval(10, 10, 30, 30, fill="lightblue")
+        self.create_text(20, 20, text=icon_text, font=("arial", 8, "bold"))
+        ToolTip(self, text)
+

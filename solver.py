@@ -56,6 +56,7 @@ class Solver:
         else:
             direction = 'minimize' if maximize == "construction_cost" else 'maximize'
         objective_var = model.addVar("objective", vtype="C", lb=None)
+        self.objective_var = objective_var
 
         #create all the variables for each of the facilities
         all_vars = {} # for each building name, the variables that decide how many will be BUILT
@@ -336,5 +337,8 @@ class Solver:
                 if round(sol[fs_var]) == 1:
                     main_frame.building_input[0].name_var.set(data.to_printable(fs_name))
                     main_frame.building_input[0].set_build_result(1)
+
+        if main_frame.advancedobjective.get():
+            main_frame.adv_solution_value_var.set(round(sol[self.objective_var], 3))
 
         return True
