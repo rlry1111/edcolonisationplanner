@@ -2,10 +2,12 @@ import tkinter
 import ttkbootstrap as ttk
 from tkinter.scrolledtext import ScrolledText
 from ttkbootstrap.tooltip import ToolTip
+from ttkbootstrap import filedialog
 
 import extract
 import ordering
 import daftmav
+import scuffed
 
 class ExportWindow(tkinter.Toplevel):
     def __init__(self, parent, extracted):
@@ -37,24 +39,46 @@ class ExportWindow(tkinter.Toplevel):
             order = ordering.get_ordering_from_result(self.extracted,
                                                            with_already_present=include_initial_state)
         if order is None:
-            self.daftmav_str = ("Error! Export failed!\n"
+            daftmav_str = ("Error! Export failed!\n"
                                 "Did you 'Solve for a system'?\n"
                                 "Please submit an issue\n"
                                 "if you did, with a\n"
                                 "screenshot of the app.")
-            self.text_entry.config(fg="red")
+            self.daftmav_text_entry.config(fg="red")
+            scuffed_str = ""
         else:
-            self.daftmav_str = daftmav.export_ordering(order)
-        self.text_entry.delete('1.0', 'end')
-        self.text_entry.insert('1.0', self.daftmav_str)
-        self.text_entry.see('1.0')
+            daftmav_str = daftmav.export_ordering(order)
+            scuffed_str = scuffed.export_ordering(order)
 
-    def export(self):
-        contents = self.text_entry.get('1.0', 'end')
+        self.set_entry_text(self.daftmav_text_entry, daftmav_str)
+        self.set_entry_text(self.scuffed_text_entry, scuffed_str)
+
+    def set_entry_text(self, entry, text):
+        entry.delete('1.0', 'end')
+        entry.insert('1.0', text)
+        entry.see('1.0')
+
+    def export_daftmav(self):
+        contents = self.daftmav_text_entry.get('1.0', 'end')
         self.clipboard_clear()
         self.clipboard_append(contents)
-        self.daftmav_button.config(text="Done!", bootstyle="success")
         self.destroy()
+
+    def export_scuffed(self):
+        contents = self.scuffed_text_entry.get('1.0', 'end')
+        self.clipboard_clear()
+        self.clipboard_append(contents)
+        self.destroy()
+
+    def export_scuffed_file(self):
+        contents = self.scuffed_text_entry.get('1.0', 'end')
+        dest = filedialog.asksaveasfile(mode='w', filetypes=[("Text files", "*.txt"), ("All files", "*")])
+        if dest:
+            dest.write(contents)
+            dest.close()
+            self.destroy()
+        else:
+            pass
 
     def create_layout(self):
         options_frame = ttk.LabelFrame(self, text="Options", padding=2)
@@ -78,14 +102,29 @@ class ExportWindow(tkinter.Toplevel):
             ToolTip(self.initial_checkbox, text="Locked because the initial state is infeasible")
         
         daftmav_frame = ttk.Frame(self, padding=2)
-        label = ttk.Label(daftmav_frame, text="Colonization Construction v3 (By DaftMav)", wraplength=100)
-        self.text_entry = ScrolledText(daftmav_frame, width=22, height=5, wrap='none')
-        self.daftmav_button = ttk.Button(daftmav_frame, text="To clipboard",
-                                         command=self.export, width=8)
+        label = ttk.Label(daftmav_frame, text="Colonization Construction v3 (By DaftMav)", wraplength=100, width=10)
+        self.daftmav_text_entry = ScrolledText(daftmav_frame, width=22, height=5, wrap='none')
+        daftmav_button = ttk.Button(daftmav_frame, text="To clipboard",
+                                         command=self.export_daftmav, width=8)
         label.pack(padx=5, pady=2, side="left", anchor=ttk.N)
-        self.text_entry.pack(padx=5, pady=2, side="left")
-        self.daftmav_button.pack(padx=5, pady=2, side="left", anchor=ttk.N)
+        self.daftmav_text_entry.pack(padx=5, pady=2, side="left")
+        daftmav_button.pack(padx=5, pady=2, side="left", anchor=ttk.N)
         daftmav_frame.pack(padx=2, pady=5, fill="x")
+
+        scuffed_frame = ttk.Frame(self, padding=2)
+        label = ttk.Label(scuffed_frame, text="Scuffed (by CMDR Nowksi)", wraplength=100, width=10)
+        self.scuffed_text_entry = ScrolledText(scuffed_frame, width=22, height=5, wrap='none')
+        scuffed_button_frame = ttk.Frame(scuffed_frame, padding=2)
+        scuffed_button_clipboard = ttk.Button(scuffed_button_frame, text="To clipboard",
+                                              command=self.export_scuffed, width=8)
+        scuffed_button_file = ttk.Button(scuffed_button_frame, text="To file",
+                                         command=self.export_scuffed_file, width=8)
+        scuffed_button_clipboard.pack(padx=2, pady=5, side="top")
+        scuffed_button_file.pack(padx=2, pady=5, side="top")
+        label.pack(padx=5, pady=2, side="left", anchor=ttk.N)
+        self.scuffed_text_entry.pack(padx=5, pady=2, side="left")
+        scuffed_button_frame.pack(padx=5, pady=2, side="left", anchor=ttk.N)
+        scuffed_frame.pack(padx=2, pady=5, fill="x")
 
         self.include_initial_state_var.trace_add("write", self.update_text)
         self.not_mix_var.trace_add("write", self.update_text)
