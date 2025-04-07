@@ -372,8 +372,10 @@ class MainWindow(ttk.Window):
 
     # Handlers for action buttons: "solve" and "clear result"
     def on_solve(self):
-        res = solver.solve(self)
-        if res and self.building_input[-1].valid:
+        to_exec = solver.solve(self.to_dict())
+        for i in to_exec[0]:
+            exec(i)
+        if to_exec[1] and self.building_input[-1].valid:
             self.add_empty_building_row()
 
     def on_clear_button(self):
@@ -511,6 +513,8 @@ class MainWindow(ttk.Window):
         if self.auto_construction_points.get():
             self.T2points_variable.set(construction_points.T2points)
             self.T3points_variable.set(construction_points.T3points)
+    def to_dict(self):
+        return {key: value for key, value in self.__dict__.items()}
 
 
 if __name__ == "__main__":

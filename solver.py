@@ -24,7 +24,14 @@ def process_expression(expression):
     expression = expression.replace(' ', '')
     return expression
 
-def solve(main_frame):
+class fake_class:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+def solve(dict_in):
+    to_exec = []
+    main_frame = fake_class(**dict_in)
     # Get data from the Entry widgets
     orbitalfacilityslots = main_frame.available_slots_currently_vars["space"].get()
     groundfacilityslots = main_frame.available_slots_currently_vars["ground"].get()
@@ -35,8 +42,8 @@ def solve(main_frame):
     choose_first_station = main_frame.choose_first_station_var.get()
 
     if not choose_first_station and data.from_printable(main_frame.building_input[0].name_var.get()) not in all_buildings:
-        main_frame.print_result("Error: pick your first station")
-        return None
+        to_exec.append('self.print_result("Error: pick your first station")')
+        return to_exec, False
 
     nb_ports_already_present = sum(row.already_present for row in main_frame.building_input if row.is_port)
     max_nb_ports = 20 + nb_ports_already_present
@@ -116,8 +123,8 @@ def solve(main_frame):
                 all_values[building_name] = all_values[building_name] + already_present
 
                 if building_name in ["Pirate_Base", "Criminal_Outpost"] and not main_frame.criminalinput.get():
-                    main_frame.print_result("Error: criminal outpost or pirate base already present, but you do not want criminal outposts to be built")
-                    return False
+                    to_exec.append('self.print_result("Error: criminal outpost or pirate base already present, but you do not want criminal outposts to be built")')
+                    return to_exec, False
 
     # Already present ports can not be built
     for port_var in port_vars.values():
@@ -194,15 +201,15 @@ def solve(main_frame):
         try:
             objective = eval_objective(processed_expression)
         except Exception as e:
-            main_frame.print_result(f"Error when computing objective: {e}")
-            return False
+            to_exec.append(f'self.print_result("Error when computing objective: {e}")')
+            return to_exec, False
     else:
         if maximize in systemscores:
             objective = systemscores[maximize]
 
         else:
-            main_frame.print_result(f"Error: One or more inputs are blank: select an objective to optimize")
-            return False
+            to_exec.append('self.print_result("Error: One or more inputs are blank: select an objective to optimize")')
+            return to_exec, False
     model.addCons(objective == objective_var)
 
     # Constraints on minimum and maximum scores
@@ -262,26 +269,25 @@ def solve(main_frame):
     model.optimize()
     sol = model.getBestSol()
     if model.getStatus() == "infeasible":
-        main_frame.print_result("Error: There is no possible system arrangement that can fit the conditions you have specified")
-        return False
+        to_exec.append('self.print_result("Error: There is no possible system arrangement that can fit the conditions you have specified")')
+        return to_exec, False
 
-    main_frame.clear_result()
+    to_exec.append('self.clear_result()')
     for building_name in all_buildings.keys():
         value = round(sol[all_vars[building_name]])
         if value <= 0:
             continue
-        result_row = main_frame.get_row_for_building(building_name)
-        result_row.set_build_result(value)
+        to_exec.append(f'self.get_row_for_building("{building_name}").set_build_result({value})')
 
     for score in all_scores:
-        main_frame.resultvars[score].set(round(sol[systemscores[score]]))
+        to_exec.append(f'self.resultvars["{score}"].set({round(sol[systemscores[score]])})')
 
-    main_frame.T2points_variable_after.set(round(sol[finalT2points]))
-    main_frame.T3points_variable_after.set(round(sol[finalT3points]))
+    to_exec.append(f'self.T2points_variable_after.set({round(sol[finalT2points])})')
+    to_exec.append(f'self.T3points_variable_after.set({round(sol[finalT3points])})')
 
-    main_frame.available_slots_after_vars["space"].set(orbitalfacilityslots - round(sol[usedslots["space"]]))
-    main_frame.available_slots_after_vars["ground"].set(groundfacilityslots - round(sol[usedslots["ground"]]))
-    main_frame.available_slots_after_vars["asteroid"].set(asteroidslots - round(sol[all_vars["Asteroid_Base"]]))
+    to_exec.append(f'self.available_slots_after_vars["space"].set({orbitalfacilityslots - round(sol[usedslots["space"]])})')
+    to_exec.append(f'self.available_slots_after_vars["ground"].set({groundfacilityslots - round(sol[usedslots["ground"]])})')
+    to_exec.append(f'self.available_slots_after_vars["asteroid"].set({asteroidslots - round(sol[all_vars["Asteroid_Base"]])})')
 
     port_types = set()
     port_order = []
@@ -291,12 +297,12 @@ def solve(main_frame):
                 port_types.add(port_name)
                 port_order.append(port_name)
     if len(port_types) > 1:
-        main_frame.set_port_ordering(port_order)
+        to_exec.append(f'self.set_port_ordering("{port_order}")')
 
     if choose_first_station:
         for fs_name, fs_var in first_station_vars.items():
             if round(sol[fs_var]) == 1:
-                main_frame.building_input[0].name_var.set(data.to_printable(fs_name))
-                main_frame.building_input[0].set_build_result(1)
+                to_exec.append(f'self.building_input[0].name_var.set("{data.to_printable(fs_name)}")')
+                to_exec.append('self.building_input[0].set_build_result(1)')
 
-    return True
+    return to_exec, True
