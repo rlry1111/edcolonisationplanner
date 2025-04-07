@@ -15,6 +15,7 @@ from scrollable_frame import ScrollableFrame
 from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value, HelpIndicator
 import solver
 import export
+import timer
 
 #TODO
 #   Add port economy (once Fdev fixes it)
@@ -365,7 +366,7 @@ class MainWindow(ttk.Window):
     def create_action_buttons(self):
         self.solver = None
         button_frame = ttk.Frame(self)
-        self.solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve)
+        self.solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve, width=15)
         self.solve_button.pack(padx=5, side="left")
         clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button)
         clear_button.pack(padx=5, side="left")
@@ -400,6 +401,7 @@ class MainWindow(ttk.Window):
             my_solver = solver.Solver(self)
             if my_solver.setup():
                 self.solver = my_solver
+                self.watch_objective_function = timer.RepeatedTimer(0.2, self.update_objective_function)
                 self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
                 self.current_thread.start()
                 self.solve_button.config(bootstyle="warning", text="Solving. Click to stop")
@@ -407,7 +409,14 @@ class MainWindow(ttk.Window):
             self.solve_button.config(text="Stopping...")
             self.solver.stop()
 
+    def update_objective_function(self):
+        if self.solver is not None:
+            value = self.solver.get_best_obj()
+            if value is not None:
+                self.adv_solution_value_var.set(value)
+
     def finish_solve(self):
+        self.watch_objective_function.stop()
         self.solve_button.config(bootstyle="primary", text="Solve for a system")
         res = self.solver.get_result()
         self.solver = None

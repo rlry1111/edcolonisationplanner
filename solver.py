@@ -287,6 +287,11 @@ class Solver:
     def stop(self):
         self.model.interruptSolve()
 
+    def get_best_obj(self):
+        if self.model.getNBestSolsFound() > 0:
+            return self.model.getPrimalbound()
+        return None
+
     def get_result(self):
         main_frame = self.main_frame
         model = self.model
