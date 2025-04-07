@@ -2,6 +2,7 @@ import os
 from platformdirs import user_data_dir
 import sys
 import tkinter
+import threading
 
 import pyglet
 import ttkbootstrap as ttk
@@ -340,9 +341,10 @@ class MainWindow(ttk.Window):
 
     # Action buttons in the middle of the window
     def create_action_buttons(self):
+        self.solver = None
         button_frame = ttk.Frame(self)
-        solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve)
-        solve_button.pack(padx=5, side="left")
+        self.solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve)
+        self.solve_button.pack(padx=5, side="left")
         clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button)
         clear_button.pack(padx=5, side="left")
         clear_all_button = ttk.Button(button_frame, text="Clear All Values", command=self.on_clear_all_button, bootstyle="danger")
@@ -372,7 +374,21 @@ class MainWindow(ttk.Window):
 
     # Handlers for action buttons: "solve" and "clear result"
     def on_solve(self):
-        res = solver.solve(self)
+        if self.solver is None:
+            my_solver = solver.Solver(self)
+            if my_solver.setup():
+                self.solver = my_solver
+                self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
+                self.current_thread.start()
+                self.solve_button.config(bootstyle="warning", text="Solving. Click to stop")
+        else:
+            self.solve_button.config(text="Stopping...")
+            self.solver.stop()
+
+    def finish_solve(self):
+        self.solve_button.config(bootstyle="primary", text="Solve for a system")
+        res = self.solver.get_result()
+        self.solver = None
         if res and self.building_input[-1].valid:
             self.add_empty_building_row()
 
