@@ -15,7 +15,7 @@ from scrollable_frame import ScrollableFrame
 from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value, HelpIndicator
 import solver
 import export
-import timer
+from threading import Timer
 
 #TODO
 #   Add port economy (once Fdev fixes it)
@@ -401,7 +401,8 @@ class MainWindow(ttk.Window):
             my_solver = solver.Solver(self)
             if my_solver.setup():
                 self.solver = my_solver
-                self.watch_objective_function = timer.RepeatedTimer(0.2, self.update_objective_function)
+                self.watch_objective_function = RepeatTimer(0.2, self.update_objective_function)
+                self.watch_objective_function.start()
                 self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
                 self.current_thread.start()
                 self.solve_button.config(bootstyle="warning", text="Solving. Click to stop")
@@ -416,7 +417,7 @@ class MainWindow(ttk.Window):
                 self.adv_solution_value_var.set(value)
 
     def finish_solve(self):
-        self.watch_objective_function.stop()
+        self.watch_objective_function.cancel()
         self.solve_button.config(bootstyle="primary", text="Solve for a system")
         res = self.solver.get_result()
         self.solver = None
@@ -561,6 +562,10 @@ class MainWindow(ttk.Window):
     def to_dict(self):
         return {key: value for key, value in self.__dict__.items()}
 
+class RepeatTimer(Timer):
+    def run(self):
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
 
 if __name__ == "__main__":
     pyglet.options['win32_gdi_font'] = True
