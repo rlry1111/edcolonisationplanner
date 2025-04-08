@@ -21,9 +21,12 @@ import import_window
 
 #TODO
 #   Add port economy (once Fdev fixes it)
-#   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
-#     * provide examples? drop-down list of presets?
 #   Use the "?" canvas in other places
+#   Tooltips on top of each building row showing how much they contribute to scores
+#   New panel allowing to modify the ordering before exporting
+#     * Show the evolution of obj. function / constraints for each building built
+#   Import/export: remember the initial ordering to be able to export it back
+#   (minor) fix the annoying behavior with scrolling that also happens when we scroll when selecting in a combobox (or in the text widgets for exporting)
 
 # Main window
 class MainWindow(ttk.Window):
