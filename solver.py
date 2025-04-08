@@ -252,8 +252,8 @@ class Solver:
             model.addCons(- portsT2constructionpoints + non_port_T2_cp >= 0)
             model.addCons(T3points_from_T2ports - portsT3constructionpoints + non_port_T3_cp >= 0)
 
-        finalT2points = - portsT2constructionpoints + non_port_T2_cp
-        finalT3points = T3points_from_T2ports - portsT3constructionpoints + non_port_T3_cp
+        self.finalT2points = - portsT2constructionpoints + non_port_T2_cp
+        self.finalT3points = T3points_from_T2ports - portsT3constructionpoints + non_port_T3_cp
 
         #sort out dependencies for facilities
         indicator_dependency_variables = {}
