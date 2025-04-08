@@ -2,8 +2,8 @@ import os
 from platformdirs import user_data_dir
 import sys
 import tkinter
+import threading
 
-import pulp
 import pyglet
 import ttkbootstrap as ttk
 from ttkbootstrap.tooltip import ToolTip
@@ -12,19 +12,23 @@ import data
 from data import all_buildings, all_scores, all_categories, all_slots
 from building_row import BuildingRow
 from scrollable_frame import ScrollableFrame
-from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value
+from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value, HelpIndicator
 import solver
 import extract
+from threading import Timer
 import export_window
 import import_window
 
 #TODO
 #   Add port economy (once Fdev fixes it)
 #   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
+#     * provide examples? drop-down list of presets?
+#   Use the "?" canvas in other places
 
 # Main window
 class MainWindow(ttk.Window):
     def __init__(self, savefile):
+        self.original_states = {}
         super().__init__(themename="darkly")
         self.style.configure('.', font=("Eurostile", 12))
         register_validate_commands(self)
@@ -52,13 +56,63 @@ class MainWindow(ttk.Window):
     # Dropdown menu at the top for choosing what to optimize
     def create_optimization_criterion_choice(self):
         self.maximizeinput = ttk.StringVar()
-        frame = ttk.Frame(self.scroll_frame.scrollable_frame)
-        frame.pack(pady=5)
-        label = ttk.Label(frame, text="Select what you are trying to optimise:")
+        basic_obj_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        basic_obj_frame.pack(pady=5)
+        label = ttk.Label(basic_obj_frame, text="Select what you are trying to maximize (except for construction cost which is minimized):")
         label.pack(side="left", padx=4, pady=5)
-        dropdown = tkinter.OptionMenu(frame, self.maximizeinput, *data.to_printable_list(all_scores))
+        dropdown = tkinter.OptionMenu(basic_obj_frame, self.maximizeinput, *data.to_printable_list(all_scores))
         dropdown.pack(side="left", padx=4, pady=5)
 
+        self.advancedobjective = ttk.BooleanVar()
+        self.direction_input = ttk.BooleanVar()
+        self.objectiveinput = ttk.StringVar()
+        containing_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
+        containing_frame.pack(pady=5)
+        advancedframe = ttk.LabelFrame(containing_frame, text="", padding=2)
+
+        help_text = "Set your own custom objective function.\nThe objective function is what the program tries to maximize/minimize (depending on what you select).\nSupported operators:\n+, -, /, *, ^, ln() (natural logarithm), abs() (absolute value), sqrt(), pow(), exp()\n(abs(x) = x if x >= 0, -x if x < 0)\n\nIf brackets are not present, standard order of operations will be followed.\nBrackets after the ln/sgn are required, for the program to recognize what to take the logarithm or sign of.\nSpaces can be placed anywhere.\nType numbers normally.\nNOTE: it is not possible to make a variable the exponent using ^ or pow(). e.g. no w^t. instead, use exp(). e.g. exp(t * ln(w))\n\nUse letters to represent the system scores:\ni: Initial population increase\nm: Maximum population increase\ne: Security\nt: Tech level\nw: Wealth\nn: Standard of living\nd: Development level\nc: Construction cost\n\nExample inputs:\nw*t^2 maximizes/minimizes wealth * (tech level squared)\n(-15*d + ln(exp(w*ln(n))))/c maximizes/minimizes (-15 * development level + ln(standard of living ^ wealth)) / construction cost"
+        helper = HelpIndicator(advancedframe, help_text)
+        helper.pack(side="right", padx=4, pady=5)
+
+        directionframe = ttk.Frame(advancedframe)
+        directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input,
+                                          bootstyle="round-toggle", state='disabled')
+        entry = ttk.Entry(advancedframe, textvariable=self.objectiveinput, width=40)
+        pretext = "Enter your custom objective function here..."
+        entry.insert(0, pretext)
+        entry.bind("<FocusIn>", lambda event: entry.delete(0, "end") if entry.get() == pretext else None)
+        entry.bind("<FocusOut>", lambda event: entry.insert(0, pretext) if not entry.get() else None)
+        entry.config(state='disabled')
+        ToolTip(entry, help_text)
+
+        def on_choose_advanced_objective():
+            if self.advancedobjective.get():
+                dropdown.config(state='disabled')
+                directionswitch.config(state='normal')
+                entry.config(state='normal')
+            else:
+                dropdown.config(state='normal')
+                directionswitch.config(state='disabled')
+                entry.config(state='disabled')
+        checkbox = ttk.Checkbutton(containing_frame, text="Advanced objective", variable=self.advancedobjective,
+                                   command=on_choose_advanced_objective)
+        advancedframe.config(labelwidget=checkbox)
+        advancedframe.pack(side="left", padx=4, pady=5)
+        self.scroll_frame.scrollable_frame.update_idletasks()
+        directionframe.pack(side="left")
+        label = ttk.Label(directionframe, text="Minimize")
+        label.pack(side="left", padx=3, pady=5)
+        ToolTip(directionswitch, text="Turn on to maximize the objective function and turn off to minimize it")
+        directionswitch.pack(side="left", padx=3, pady=5)
+        label = ttk.Label(directionframe, text="Maximize")
+        label.pack(side="left", pady=5)
+        entry.pack(padx=4, pady=5, side="left")
+
+        self.adv_solution_value_var = ttk.DoubleVar()
+        self.adv_solution_value = ttk.Entry(advancedframe, textvariable=self.adv_solution_value_var,
+                                            state="readonly", width=7)
+        ttk.Label(advancedframe, text="Solution value:").pack(padx=4, pady=5, side="left")
+        self.adv_solution_value.pack(padx=4, pady=5, side="left")
 
     # Main panel in the middle
     def create_main_panel(self):
@@ -225,7 +279,7 @@ class MainWindow(ttk.Window):
         self.first_station_cb_coriolis_var = ttk.BooleanVar(value=True)
         self.first_station_cb_asteroid_var = ttk.BooleanVar(value=True)
         self.first_station_cb_orbis_var = ttk.BooleanVar(value=True)
-        first_station_checkbox = ttk.Checkbutton(self.right_frame, text="Let the program choose the first Station",
+        first_station_checkbox = ttk.Checkbutton(self.right_frame, text="Let the program choose the first station",
                                                  variable=self.choose_first_station_var)
         first_station_frame = ttk.LabelFrame(self.right_frame, text="Test",
                                              labelwidget=first_station_checkbox, padding=2)
@@ -311,11 +365,12 @@ class MainWindow(ttk.Window):
 
     # Action buttons in the bottom of the window
     def create_action_buttons(self):
+        self.solver = None
         button_frame = ttk.Frame(self)
+        self.solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve, width=15)
+        self.solve_button.pack(padx=5, side="left")
         import_button = ttk.Button(button_frame, text="Import Initial State", command=self.on_import_button, bootstyle="primary")
         import_button.pack(padx=5, side="left")
-        solve_button = ttk.Button(button_frame, text="Solve for a system", command=self.on_solve, bootstyle="success")
-        solve_button.pack(padx=5, side="left")
         export_button = ttk.Button(button_frame, text="Export Solution", command=self.on_export_button, bootstyle="primary")
         export_button.pack(padx=5, side="left")
         clear_button = ttk.Button(button_frame, text="Clear Result", command=self.on_clear_button, bootstyle="warning")
@@ -323,12 +378,6 @@ class MainWindow(ttk.Window):
         clear_all_button = ttk.Button(button_frame, text="Clear All Values", command=self.on_clear_all_button, bootstyle="danger")
         clear_all_button.pack(padx=5, side="left")
         button_frame.pack(pady=7)
-
-    # Handlers for action buttons: "solve" and "clear result"
-    def on_solve(self):
-        res = solver.solve(self)
-        if res and self.building_input[-1].valid:
-            self.add_empty_building_row()
 
     def on_clear_button(self):
         self.clear_result()
@@ -366,6 +415,37 @@ class MainWindow(ttk.Window):
         reload_button = ttk.Button(frame, text="Reload", command=self.on_select_plan)
         reload_button.pack(padx=5, side="left")
         frame.pack(pady=7)
+
+    # Handlers for action buttons: "solve" and "clear result"
+    def on_solve(self):
+        if self.solver is None:
+            my_solver = solver.Solver(self)
+            if my_solver.setup():
+                self.solver = my_solver
+                self.disable_all_except(self.solve_button)
+                self.watch_objective_function = RepeatTimer(0.2, self.update_objective_function)
+                self.watch_objective_function.start()
+                self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
+                self.current_thread.start()
+                self.solve_button.config(bootstyle="warning", text="Solving. Click to stop")
+        else:
+            self.solve_button.config(text="Stopping...")
+            self.solver.stop()
+
+    def update_objective_function(self):
+        if self.solver is not None:
+            value = self.solver.get_best_obj()
+            if value is not None:
+                self.adv_solution_value_var.set(value)
+
+    def finish_solve(self):
+        self.restore_original_states()
+        self.watch_objective_function.cancel()
+        self.solve_button.config(bootstyle="primary", text="Solve for a system")
+        res = self.solver.get_result()
+        self.solver = None
+        if res and self.building_input[-1].valid:
+            self.add_empty_building_row()
 
     def on_save_button(self):
         system = self.system_name_var.get()
@@ -501,6 +581,30 @@ class MainWindow(ttk.Window):
 
         if "Pirate_Base" in state.facilities or "Criminal_Outpost" in state.facilities:
             self.criminalinput.set(True)
+
+    def to_dict(self):
+        return {key: value for key, value in self.__dict__.items()}
+    def disable_all_except(self, target_widget):
+        def disable_widgets(widget):
+            for child in widget.winfo_children():
+                disable_widgets(child)
+                if child == target_widget:
+                    continue
+                if hasattr(child, "cget") and "state" in child.keys():
+                    if child not in self.original_states:
+                        self.original_states[child] = child.cget("state")
+                    child.configure(state="disabled")
+        disable_widgets(root)
+    def restore_original_states(self):
+        for widget, state in self.original_states.items():
+            if hasattr(widget, "cget") and "state" in widget.keys():
+                widget.configure(state=state)
+        self.original_states.clear()
+
+class RepeatTimer(Timer):
+    def run(self):
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
 
 if __name__ == "__main__":
     pyglet.options['win32_gdi_font'] = True
