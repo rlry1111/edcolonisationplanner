@@ -21,9 +21,12 @@ import import_window
 
 #TODO
 #   Add port economy (once Fdev fixes it)
-#   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
-#     * provide examples? drop-down list of presets?
 #   Use the "?" canvas in other places
+#   Tooltips on top of each building row showing how much they contribute to scores
+#   New panel allowing to modify the ordering before exporting
+#     * Show the evolution of obj. function / constraints for each building built
+#   Import/export: remember the initial ordering to be able to export it back
+#   (minor) fix the annoying behavior with scrolling that also happens when we scroll when selecting in a combobox (or in the text widgets for exporting)
 
 # Main window
 class MainWindow(ttk.Window):
@@ -55,6 +58,14 @@ class MainWindow(ttk.Window):
 
     # Dropdown menu at the top for choosing what to optimize
     def create_optimization_criterion_choice(self):
+
+        self.preset_advanced_objectives = {
+            "Balance all stats": "sqrt(i) + sqrt(m) + sqrt(e) + sqrt(t) + sqrt(w) + sqrt(n) + sqrt(d)",
+            "Balance harder": "i^0.2 + m^0.2 + e^0.2 + t^0.2 + w^0.2 + n^0.2 + d^0.2",
+            "Balance hardest": "ln(i) + ln(m) + ln(e) + ln(t) + ln(w) + ln(n) + ln(d)",
+        }
+        pretext = "Enter your custom objective function here..."
+
         self.maximizeinput = ttk.StringVar()
         basic_obj_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
         basic_obj_frame.pack(pady=5)
@@ -65,7 +76,7 @@ class MainWindow(ttk.Window):
 
         self.advancedobjective = ttk.BooleanVar()
         self.direction_input = ttk.BooleanVar()
-        self.objectiveinput = ttk.StringVar()
+        self.objectiveinput = ttk.StringVar(value=pretext)
         containing_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
         containing_frame.pack(pady=5)
         advancedframe = ttk.LabelFrame(containing_frame, text="", padding=2)
@@ -77,25 +88,28 @@ class MainWindow(ttk.Window):
         directionframe = ttk.Frame(advancedframe)
         directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input,
                                           bootstyle="round-toggle", state='disabled')
-        entry = ttk.Entry(advancedframe, textvariable=self.objectiveinput, width=40)
-        pretext = "Enter your custom objective function here..."
-        entry.insert(0, pretext)
-        entry.bind("<FocusIn>", lambda event: entry.delete(0, "end") if entry.get() == pretext else None)
-        entry.bind("<FocusOut>", lambda event: entry.insert(0, pretext) if not entry.get() else None)
+        entry = ttk.Combobox(advancedframe, textvariable=self.objectiveinput, width=40,
+                             values=list(self.preset_advanced_objectives.keys()))
+        entry.bind("<FocusIn>", lambda event: self.objectiveinput.set("") if self.objectiveinput.get() == pretext else None)
+        entry.bind("<FocusOut>", lambda event: self.objectiveinput.set(pretext) if self.objectiveinput.get() == "" else None)
         entry.config(state='disabled')
         ToolTip(entry, help_text)
+        self.objectiveinput.trace_add("write", self.on_set_objective_function)
 
-        def on_choose_advanced_objective():
+        def on_choose_advanced_objective(*args):
             if self.advancedobjective.get():
                 dropdown.config(state='disabled')
                 directionswitch.config(state='normal')
                 entry.config(state='normal')
+                self.adv_solution_value.config(state='readonly')
             else:
                 dropdown.config(state='normal')
                 directionswitch.config(state='disabled')
                 entry.config(state='disabled')
-        checkbox = ttk.Checkbutton(containing_frame, text="Advanced objective", variable=self.advancedobjective,
-                                   command=on_choose_advanced_objective)
+                self.adv_solution_value.config(state='disabled')
+
+        checkbox = ttk.Checkbutton(containing_frame, text="Advanced objective", variable=self.advancedobjective)
+        self.advancedobjective.trace_add("write", on_choose_advanced_objective)
         advancedframe.config(labelwidget=checkbox)
         advancedframe.pack(side="left", padx=4, pady=5)
         self.scroll_frame.scrollable_frame.update_idletasks()
@@ -110,9 +124,16 @@ class MainWindow(ttk.Window):
 
         self.adv_solution_value_var = ttk.DoubleVar()
         self.adv_solution_value = ttk.Entry(advancedframe, textvariable=self.adv_solution_value_var,
-                                            state="readonly", width=7)
+                                            state="disabled", width=7)
         ttk.Label(advancedframe, text="Solution value:").pack(padx=4, pady=5, side="left")
         self.adv_solution_value.pack(padx=4, pady=5, side="left")
+
+
+    def on_set_objective_function(self, *args):
+        text = self.objectiveinput.get()
+        if text in self.preset_advanced_objectives:
+            self.objectiveinput.set(self.preset_advanced_objectives[text])
+            self.direction_input.set(True)
 
     # Main panel in the middle
     def create_main_panel(self):
@@ -161,6 +182,7 @@ class MainWindow(ttk.Window):
         self.minvars = {}
         self.maxvars = {}
         self.resultvars = {}
+        self.result_entries = {}
 
         constraint_frame = ttk.LabelFrame(self.mixed_frame, text="System Stats", padding=2)
         constraint_frame.pack(padx=10, pady=5, side="left", fill="y")
@@ -187,8 +209,8 @@ class MainWindow(ttk.Window):
             result = ttk.Entry(constraint_frame, textvariable=self.resultvars[name], width=7, justify=ttk.RIGHT)
             result.grid(column=3, row=2+i, padx=5, pady=2)
             result.config(state="readonly")
+            self.result_entries[name] = result
             set_style_if_negative(self.resultvars[name], result)
-
 
     # Panel for available construction slots in the system
     def create_slots_panel(self):
@@ -422,7 +444,8 @@ class MainWindow(ttk.Window):
             my_solver = solver.Solver(self)
             if my_solver.setup():
                 self.solver = my_solver
-                self.disable_all_except(self.solve_button)
+                self.clear_result()
+                self.disable_all_except([self.solve_button, self.adv_solution_value] + list(self.result_entries.values()))
                 self.watch_objective_function = RepeatTimer(0.2, self.update_objective_function)
                 self.watch_objective_function.start()
                 self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
@@ -436,7 +459,10 @@ class MainWindow(ttk.Window):
         if self.solver is not None:
             value = self.solver.get_best_obj()
             if value is not None:
-                self.adv_solution_value_var.set(value)
+                self.adv_solution_value_var.set(round(value, 3))
+                sol = self.solver.model.getBestSol()
+                for score in all_scores:
+                    self.resultvars[score].set(round(sol[self.solver.systemscores[score]]))
 
     def finish_solve(self):
         self.restore_original_states()
@@ -527,6 +553,7 @@ class MainWindow(ttk.Window):
         self.T3points_variable_after.set(0)
         for score in all_scores:
             self.resultvars[score].set(0)
+        self.adv_solution_value_var.set(0)
 
         if self.choose_first_station_var.get():
             self.building_input[0].name_var.set("Let the program choose for me")
@@ -584,11 +611,11 @@ class MainWindow(ttk.Window):
 
     def to_dict(self):
         return {key: value for key, value in self.__dict__.items()}
-    def disable_all_except(self, target_widget):
+    def disable_all_except(self, target_widgets):
         def disable_widgets(widget):
             for child in widget.winfo_children():
                 disable_widgets(child)
-                if child == target_widget:
+                if child in target_widgets:
                     continue
                 if hasattr(child, "cget") and "state" in child.keys():
                     if child not in self.original_states:
