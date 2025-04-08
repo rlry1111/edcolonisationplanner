@@ -316,7 +316,6 @@ class Solver:
             return False
         sol = model.getBestSol()
 
-        main_frame.clear_result()
         for building_name in all_buildings.keys():
             value = round(sol[self.all_vars[building_name]])
             if value <= 0:

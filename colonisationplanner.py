@@ -164,6 +164,7 @@ class MainWindow(ttk.Window):
         self.minvars = {}
         self.maxvars = {}
         self.resultvars = {}
+        self.result_entries = {}
 
         constraint_frame = ttk.LabelFrame(self.mixed_frame, text="System Stats", padding=2)
         constraint_frame.pack(padx=10, pady=5, side="left", fill="y")
@@ -190,8 +191,8 @@ class MainWindow(ttk.Window):
             result = ttk.Entry(constraint_frame, textvariable=self.resultvars[name], width=7, justify=ttk.RIGHT)
             result.grid(column=3, row=2+i, padx=5, pady=2)
             result.config(state="readonly")
+            self.result_entries[name] = result
             set_style_if_negative(self.resultvars[name], result)
-
 
     # Panel for available construction slots in the system
     def create_slots_panel(self):
@@ -426,7 +427,7 @@ class MainWindow(ttk.Window):
             if my_solver.setup():
                 self.solver = my_solver
                 self.clear_result()
-                self.disable_all_except([self.solve_button, self.adv_solution_value])
+                self.disable_all_except([self.solve_button, self.adv_solution_value] + list(self.result_entries.values()))
                 self.watch_objective_function = RepeatTimer(0.2, self.update_objective_function)
                 self.watch_objective_function.start()
                 self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
@@ -440,7 +441,10 @@ class MainWindow(ttk.Window):
         if self.solver is not None:
             value = self.solver.get_best_obj()
             if value is not None:
-                self.adv_solution_value_var.set(value)
+                self.adv_solution_value_var.set(round(value, 3))
+                sol = self.solver.model.getBestSol()
+                for score in all_scores:
+                    self.resultvars[score].set(round(sol[self.solver.systemscores[score]]))
 
     def finish_solve(self):
         self.restore_original_states()
