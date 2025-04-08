@@ -90,10 +90,13 @@ class MainWindow(ttk.Window):
                 dropdown.config(state='disabled')
                 directionswitch.config(state='normal')
                 entry.config(state='normal')
+                self.adv_solution_value.config(state='readonly')
             else:
                 dropdown.config(state='normal')
                 directionswitch.config(state='disabled')
                 entry.config(state='disabled')
+                self.adv_solution_value.config(state='disabled')
+
         checkbox = ttk.Checkbutton(containing_frame, text="Advanced objective", variable=self.advancedobjective)
         self.advancedobjective.trace_add("write", on_choose_advanced_objective)
         advancedframe.config(labelwidget=checkbox)
@@ -110,7 +113,7 @@ class MainWindow(ttk.Window):
 
         self.adv_solution_value_var = ttk.DoubleVar()
         self.adv_solution_value = ttk.Entry(advancedframe, textvariable=self.adv_solution_value_var,
-                                            state="readonly", width=7)
+                                            state="disabled", width=7)
         ttk.Label(advancedframe, text="Solution value:").pack(padx=4, pady=5, side="left")
         self.adv_solution_value.pack(padx=4, pady=5, side="left")
 
@@ -422,7 +425,8 @@ class MainWindow(ttk.Window):
             my_solver = solver.Solver(self)
             if my_solver.setup():
                 self.solver = my_solver
-                self.disable_all_except(self.solve_button)
+                self.clear_result()
+                self.disable_all_except([self.solve_button, self.adv_solution_value])
                 self.watch_objective_function = RepeatTimer(0.2, self.update_objective_function)
                 self.watch_objective_function.start()
                 self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
@@ -527,6 +531,7 @@ class MainWindow(ttk.Window):
         self.T3points_variable_after.set(0)
         for score in all_scores:
             self.resultvars[score].set(0)
+        self.adv_solution_value_var.set(0)
 
         if self.choose_first_station_var.get():
             self.building_input[0].name_var.set("Let the program choose for me")
@@ -584,11 +589,11 @@ class MainWindow(ttk.Window):
 
     def to_dict(self):
         return {key: value for key, value in self.__dict__.items()}
-    def disable_all_except(self, target_widget):
+    def disable_all_except(self, target_widgets):
         def disable_widgets(widget):
             for child in widget.winfo_children():
                 disable_widgets(child)
-                if child == target_widget:
+                if child in target_widgets:
                     continue
                 if hasattr(child, "cget") and "state" in child.keys():
                     if child not in self.original_states:
