@@ -28,6 +28,7 @@ from threading import Timer
 # Main window
 class MainWindow(ttk.Window):
     def __init__(self, savefile):
+        self.original_states = {}
         super().__init__(themename="darkly")
         self.style.configure('.', font=("Eurostile", 12))
         register_validate_commands(self)
@@ -401,6 +402,7 @@ class MainWindow(ttk.Window):
             my_solver = solver.Solver(self)
             if my_solver.setup():
                 self.solver = my_solver
+                self.disable_all_except(self.solve_button)
                 self.watch_objective_function = RepeatTimer(0.2, self.update_objective_function)
                 self.watch_objective_function.start()
                 self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
@@ -417,6 +419,7 @@ class MainWindow(ttk.Window):
                 self.adv_solution_value_var.set(value)
 
     def finish_solve(self):
+        self.restore_original_states()
         self.watch_objective_function.cancel()
         self.solve_button.config(bootstyle="primary", text="Solve for a system")
         res = self.solver.get_result()
@@ -561,6 +564,22 @@ class MainWindow(ttk.Window):
             self.T3points_variable.set(construction_points.T3points)
     def to_dict(self):
         return {key: value for key, value in self.__dict__.items()}
+    def disable_all_except(self, target_widget):
+        def disable_widgets(widget):
+            for child in widget.winfo_children():
+                disable_widgets(child)
+                if child == target_widget:
+                    continue
+                if hasattr(child, "cget") and "state" in child.keys():
+                    if child not in self.original_states:
+                        self.original_states[child] = child.cget("state")
+                    child.configure(state="disabled")
+        disable_widgets(root)
+    def restore_original_states(self):
+        for widget, state in self.original_states.items():
+            if hasattr(widget, "cget") and "state" in widget.keys():
+                widget.configure(state=state)
+        self.original_states.clear()
 
 class RepeatTimer(Timer):
     def run(self):
