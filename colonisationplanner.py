@@ -55,6 +55,14 @@ class MainWindow(ttk.Window):
 
     # Dropdown menu at the top for choosing what to optimize
     def create_optimization_criterion_choice(self):
+
+        self.preset_advanced_objectives = {
+            "Balance all stats": "sqrt(i) + sqrt(m) + sqrt(e) + sqrt(t) + sqrt(w) + sqrt(n) + sqrt(d)",
+            "Balance harder": "i^0.2 + m^0.2 + e^0.2 + t^0.2 + w^0.2 + n^0.2 + d^0.2",
+            "Balance hardest": "ln(i) + ln(m) + ln(e) + ln(t) + ln(w) + ln(n) + ln(d)",
+        }
+        pretext = "Enter your custom objective function here..."
+
         self.maximizeinput = ttk.StringVar()
         basic_obj_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
         basic_obj_frame.pack(pady=5)
@@ -65,7 +73,7 @@ class MainWindow(ttk.Window):
 
         self.advancedobjective = ttk.BooleanVar()
         self.direction_input = ttk.BooleanVar()
-        self.objectiveinput = ttk.StringVar()
+        self.objectiveinput = ttk.StringVar(value=pretext)
         containing_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
         containing_frame.pack(pady=5)
         advancedframe = ttk.LabelFrame(containing_frame, text="", padding=2)
@@ -77,13 +85,13 @@ class MainWindow(ttk.Window):
         directionframe = ttk.Frame(advancedframe)
         directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input,
                                           bootstyle="round-toggle", state='disabled')
-        entry = ttk.Entry(advancedframe, textvariable=self.objectiveinput, width=40)
-        pretext = "Enter your custom objective function here..."
-        entry.insert(0, pretext)
-        entry.bind("<FocusIn>", lambda event: entry.delete(0, "end") if entry.get() == pretext else None)
-        entry.bind("<FocusOut>", lambda event: entry.insert(0, pretext) if not entry.get() else None)
+        entry = ttk.Combobox(advancedframe, textvariable=self.objectiveinput, width=40,
+                             values=list(self.preset_advanced_objectives.keys()))
+        entry.bind("<FocusIn>", lambda event: self.objectiveinput.set("") if self.objectiveinput.get() == pretext else None)
+        entry.bind("<FocusOut>", lambda event: self.objectiveinput.set(pretext) if self.objectiveinput.get() == "" else None)
         entry.config(state='disabled')
         ToolTip(entry, help_text)
+        self.objectiveinput.trace_add("write", self.on_set_objective_function)
 
         def on_choose_advanced_objective(*args):
             if self.advancedobjective.get():
@@ -116,6 +124,13 @@ class MainWindow(ttk.Window):
                                             state="disabled", width=7)
         ttk.Label(advancedframe, text="Solution value:").pack(padx=4, pady=5, side="left")
         self.adv_solution_value.pack(padx=4, pady=5, side="left")
+
+
+    def on_set_objective_function(self, *args):
+        text = self.objectiveinput.get()
+        if text in self.preset_advanced_objectives:
+            self.objectiveinput.set(self.preset_advanced_objectives[text])
+            self.direction_input.set(True)
 
     # Main panel in the middle
     def create_main_panel(self):
