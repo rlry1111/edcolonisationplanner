@@ -202,7 +202,6 @@ class Solver:
 
         # Objective function
         if main_frame.advancedobjective.get():
-            model.setParam("limits/time", 600)
             processed_expression = process_expression(main_frame.objectiveinput.get())
             #security risk
             try:
