@@ -85,7 +85,7 @@ class MainWindow(ttk.Window):
         entry.config(state='disabled')
         ToolTip(entry, help_text)
 
-        def on_choose_advanced_objective():
+        def on_choose_advanced_objective(*args):
             if self.advancedobjective.get():
                 dropdown.config(state='disabled')
                 directionswitch.config(state='normal')
@@ -94,8 +94,8 @@ class MainWindow(ttk.Window):
                 dropdown.config(state='normal')
                 directionswitch.config(state='disabled')
                 entry.config(state='disabled')
-        checkbox = ttk.Checkbutton(containing_frame, text="Advanced objective", variable=self.advancedobjective,
-                                   command=on_choose_advanced_objective)
+        checkbox = ttk.Checkbutton(containing_frame, text="Advanced objective", variable=self.advancedobjective)
+        self.advancedobjective.trace_add("write", on_choose_advanced_objective)
         advancedframe.config(labelwidget=checkbox)
         advancedframe.pack(side="left", padx=4, pady=5)
         self.scroll_frame.scrollable_frame.update_idletasks()
