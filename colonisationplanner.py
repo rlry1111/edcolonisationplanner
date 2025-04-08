@@ -20,9 +20,7 @@ from threading import Timer
 #TODO
 #   Add port economy (once Fdev fixes it)
 #   Add custom maximum e.g. maximize wealth^2*techlevel (will need to switch to minlp)
-#     * include in save/load
 #     * provide examples? drop-down list of presets?
-#     * NEED a threaded solve execution with something that shows progress
 #   Use the "?" canvas in other places
 
 # Main window
