@@ -59,7 +59,13 @@ class SaveFile:
 # Creates a dictionary with the current state of the app
 def extract_from_frame(main_frame, with_solution=True):
     result = {}
-    result["optimize"] = from_printable(main_frame.maximizeinput.get())
+    result["advanced_objective"] = main_frame.advancedobjective.get()
+    if main_frame.advancedobjective.get():
+        result["direction_input"] = main_frame.direction_input.get()
+        result["objective_input"] = main_frame.objectiveinput.get()
+        result["advanced_objective_value"] = main_frame.adv_solution_value_var.get()
+    else:
+        result["optimize"] = from_printable(main_frame.maximizeinput.get())
     result["score_constraints"] = {}
     for score in all_scores:
         extracted = extract_score_from_frame(main_frame, score)
@@ -170,7 +176,10 @@ def combine_building_constraints(first, second):
 # This will ignore the solution, only imports the initial state and constraints
 def import_into_frame(main_frame, result):
     main_frame.clear_all()
-
+    main_frame.advancedobjective.set(result.get("advanced_objective", False))
+    main_frame.direction_input.set(result.get("direction_input", False))
+    main_frame.objectiveinput.set(result.get("objective_input", ""))
+    main_frame.adv_solution_value_var.set(result.get("advanced_objective_value", 0))
     main_frame.maximizeinput.set(to_printable(result.get("optimize", "")))
     for score, constraints in result.get("score_constraints", {}).items():
         if "min" in constraints:
@@ -277,7 +286,8 @@ def import_solution_into_frame(main_frame, result):
     construction_points.T2points = main_frame.T2points_variable.get()
     construction_points.T3points = main_frame.T3points_variable.get()
     if first_station_name:
-        construction_points.add_building(all_buildings[first_station_name], 1, first_station=True)
+        if first_station_name != 'Let_the_program_choose_for_me':
+            construction_points.add_building(all_buildings[first_station_name], 1, first_station=True)
     for name, nb in to_build.items():
         construction_points.add_building(all_buildings[name], nb)
     main_frame.T2points_variable_after.set(construction_points.T2points)

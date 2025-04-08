@@ -158,7 +158,7 @@ def from_printable(display_name):
 def compute_all_scores(solution):
     values = {}
     for score in base_scores:
-        value = sum(getattr(all_buildings[b], score) * nb for b, nb in solution.items())
+        value = sum(0 if b == 'Let_the_program_choose_for_me' else getattr(all_buildings[b], score) * nb for b, nb in solution.items())
         values[score] = value
     for score in compound_scores:
         values[score] = compute_compound_score(score, values)
