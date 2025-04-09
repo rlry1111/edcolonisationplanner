@@ -22,7 +22,7 @@ class BuildingRow:
             self.category_choice = ttk.Label(self.parent, text="First Station", width=15)
             values.append("Let the program choose for me")
         else:
-            self.category_var = ttk.StringVar(value="All" if result_building is None else "Result")
+            self.category_var = ttk.StringVar(value="All")
             self.category_choice = ttk.Combobox(self.parent, textvariable=self.category_var,
                                                 width=15, state="readonly", values=list(all_categories.keys()))
             self.category_var.trace_add("write", self.on_category_choice)
