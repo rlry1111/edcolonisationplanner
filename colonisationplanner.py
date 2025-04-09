@@ -63,8 +63,10 @@ class MainWindow(ttk.Window):
             "Balance all stats": "sqrt(i) + sqrt(m) + sqrt(e) + sqrt(t) + sqrt(w) + sqrt(n) + sqrt(d)",
             "Balance harder": "i^0.2 + m^0.2 + e^0.2 + t^0.2 + w^0.2 + n^0.2 + d^0.2",
             "Balance hardest": "ln(i) + ln(m) + ln(e) + ln(t) + ln(w) + ln(n) + ln(d)",
+            "Maximize wealth and tech, ensures wealth is close to 2*tech": "2 * w + t - abs(w - 2 * t)",
+            "maximize security ^ standard of living": "exp(n*ln(e))"
         }
-        pretext = "Enter your custom objective function here..."
+        pretext = "Enter your own custom objective function here... \n(or click the dropdown for examples)"
 
         self.maximizeinput = ttk.StringVar()
         basic_obj_frame = ttk.Frame(self.scroll_frame.scrollable_frame)
@@ -88,10 +90,10 @@ class MainWindow(ttk.Window):
         directionframe = ttk.Frame(advancedframe)
         directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input,
                                           bootstyle="round-toggle", state='disabled')
-        entry = ttk.Combobox(advancedframe, textvariable=self.objectiveinput, width=40,
-                             values=list(self.preset_advanced_objectives.keys()))
+        entry = ttk.Combobox(advancedframe, textvariable=self.objectiveinput, width=56,
+                             values=list(self.preset_advanced_objectives.keys()), font="eurostile")
         entry.bind("<FocusIn>", lambda event: self.objectiveinput.set("") if self.objectiveinput.get() == pretext else None)
-        entry.bind("<FocusOut>", lambda event: self.objectiveinput.set(pretext) if self.objectiveinput.get() == "" else None)
+        entry.bind("<FocusOut>", lambda event: self.objectiveinput.set(pretext) if self.objectiveinput.get() == "" else entry.config(font=("eurostile", 12)))
         entry.config(state='disabled')
         ToolTip(entry, help_text)
         self.objectiveinput.trace_add("write", self.on_set_objective_function)
@@ -446,11 +448,13 @@ class MainWindow(ttk.Window):
                 self.solver = my_solver
                 self.clear_result()
                 self.disable_all_except([self.solve_button, self.adv_solution_value] + list(self.result_entries.values()))
+                self.dot_counter = 1
+                self.dots = ""
                 self.watch_objective_function = RepeatTimer(0.2, self.update_objective_function)
                 self.watch_objective_function.start()
                 self.current_thread = threading.Thread(target=lambda: self.solver.solve(callback=self.finish_solve))
                 self.current_thread.start()
-                self.solve_button.config(bootstyle="warning", text="Solving. Click to stop")
+                self.solve_button.config(bootstyle="warning", text=f"Solving{self.dots} Click to stop")
         else:
             self.solve_button.config(text="Stopping...")
             self.solver.stop()
@@ -463,6 +467,15 @@ class MainWindow(ttk.Window):
                 sol = self.solver.model.getBestSol()
                 for score in all_scores:
                     self.resultvars[score].set(round(sol[self.solver.systemscores[score]]))
+        if self.dot_counter == 1:
+            self.dot_counter += 1
+        else:
+            self.dot_counter = 1
+            if self.dots == "...":
+                self.dots = ""
+            else:
+                self.dots += "."
+            self.solve_button.config(text=f"Solving{self.dots} Click to stop")
 
     def finish_solve(self):
         self.restore_original_states()
@@ -646,4 +659,5 @@ if __name__ == "__main__":
         pyglet.font.add_file('eurostile.TTF')
 
     root = MainWindow(savefile)
+    root.state('zoomed')
     root.mainloop()
