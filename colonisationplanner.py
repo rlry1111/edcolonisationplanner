@@ -93,7 +93,7 @@ class MainWindow(ttk.Window):
         entry = ttk.Combobox(advancedframe, textvariable=self.objectiveinput, width=56,
                              values=list(self.preset_advanced_objectives.keys()), font="eurostile")
         entry.bind("<FocusIn>", lambda event: self.objectiveinput.set("") if self.objectiveinput.get() == pretext else None)
-        entry.bind("<FocusOut>", lambda event: self.objectiveinput.set(pretext) if self.objectiveinput.get() == "" else entry.config(font=("eurostile", 12)))
+        entry.bind("<FocusOut>", lambda event: self.objectiveinput.set(pretext) if self.objectiveinput.get() == "" else None)
         entry.config(state='disabled')
         ToolTip(entry, help_text)
         self.objectiveinput.trace_add("write", self.on_set_objective_function)
