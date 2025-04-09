@@ -659,5 +659,8 @@ if __name__ == "__main__":
         pyglet.font.add_file('eurostile.TTF')
 
     root = MainWindow(savefile)
-    root.state('zoomed')
+    try:
+        root.state('zoomed')
+    except tkinter.TclError:
+        root.attributes('-zoomed', True)
     root.mainloop()
