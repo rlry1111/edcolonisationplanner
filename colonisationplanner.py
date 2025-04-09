@@ -438,6 +438,10 @@ class MainWindow(ttk.Window):
         save_button.pack(padx=5, side="left")
         reload_button = ttk.Button(frame, text="Reload", command=self.on_select_plan)
         reload_button.pack(padx=5, side="left")
+        delete_plan_button = ttk.Button(frame, text="Delete plan", command=self.on_delete_plan, bootstyle="warning")
+        delete_plan_button.pack(padx=5, side="left")
+        delete_system_button = ttk.Button(frame, text="Delete system", command=self.on_delete_system, bootstyle="danger")
+        delete_system_button.pack(padx=5, side="left")
         frame.pack(pady=7)
 
     # Handlers for action buttons: "solve" and "clear result"
@@ -512,6 +516,19 @@ class MainWindow(ttk.Window):
         if system and plan and plan in self.save_file.get_plan_list(system):
             self.save_file.load_plan(system, plan, self, with_solution=True)
 
+    def on_delete_plan(self, *args):
+        system = self.system_name_var.get()
+        plan = self.plan_name_var.get()
+        if system and plan and plan in self.save_file.get_plan_list(system):
+            self.save_file.delete_plan(system, plan)
+            self.on_select_system()
+
+    def on_delete_system(self, *args):
+        system = self.system_name_var.get()
+        if system and system in self.save_file.contents:
+            self.save_file.delete_system(system)
+            self.system_name_entry.config(values=self.save_file.get_system_list())
+            self.system_name_var.set("")
 
     # Bottom-most panel: several rows for different building types. Also where the result is displayed
     def create_result_panel(self):

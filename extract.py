@@ -52,6 +52,16 @@ class SaveFile:
         self.contents[system][plan] = result
         self.dump()
 
+    def delete_plan(self, system, plan):
+        if system in self.contents and plan in self.contents[system]:
+            del self.contents[system][plan]
+            self.dump()
+
+    def delete_system(self, system):
+        if system in self.contents:
+            del self.contents[system]
+            self.dump()
+
     def dump(self):
         with open(self.filename, "w") as fp:
             json.dump(self.contents, fp, indent=2)
