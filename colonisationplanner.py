@@ -268,7 +268,8 @@ class MainWindow(ttk.Window):
 
             available.bind("<FocusOut>", lambda event, var=self.available_slots_currently_vars[slot]: on_focus_out(event, var))
             available.config(bootstyle="primary")
-            self.available_slots_after_vars[slot].trace_add("write", lambda *args, slot=slot: self.on_write_to_used_slots_after(slot))
+            slot2 = slot
+            self.available_slots_after_vars[slot].trace_add("write", lambda *args, slot=slot2: self.on_write_to_used_slots_after(slot))
             self.available_slots_currently_entries[slot] = available
             self.total_slots_currently_entries[slot] = total
 
