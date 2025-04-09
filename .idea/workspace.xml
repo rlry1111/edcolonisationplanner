@@ -4,12 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b884c2f4-d349-4699-b108-d8fe125694c7" name="Changes" comment="added custom objective">
+    <list default="true" id="0d21201e-d25a-46fe-b172-3f1fc2a892f7" name="Changes" comment="fixed minor mistake">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/colonisationplanner.py" beforeDir="false" afterPath="$PROJECT_DIR$/colonisationplanner.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extract.py" beforeDir="false" afterPath="$PROJECT_DIR$/extract.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/solver.py" beforeDir="false" afterPath="$PROJECT_DIR$/solver.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tksetup.py" beforeDir="false" afterPath="$PROJECT_DIR$/tksetup.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -17,48 +14,37 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_BRANCH_BY_REPOSITORY">
-      <map>
-        <entry key="$PROJECT_DIR$" value="main" />
-      </map>
-    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory">{
-  &quot;lastFilter&quot;: {
-    &quot;state&quot;: &quot;OPEN&quot;,
-    &quot;assignee&quot;: &quot;rlry1111&quot;
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "rlry1111"
   }
-}</component>
-  <component name="GithubPullRequestsUISettings">{
-  &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/rlry1111/edcolonisationplanner.git&quot;,
-    &quot;accountId&quot;: &quot;735f5df6-2fbe-475c-a252-8d4e2e40fc00&quot;
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/rlry1111/edcolonisationplanner.git",
+    "accountId": "735f5df6-2fbe-475c-a252-8d4e2e40fc00"
   }
-}</component>
-  <component name="ProjectColorInfo">{
-  &quot;associatedIndex&quot;: 6
-}</component>
-  <component name="ProjectId" id="2uQZ66cq7XF0UgGpCyJxHDiWdid" />
+}]]></component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 1
+}]]></component>
+  <component name="ProjectId" id="2vU5pjX8vJLJltREr8cOadCnHqz" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "Python.colonisationplanner.executor": "Run",
-    "Python.solver.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "Merging main",
-    "ignore.virus.scanning.warn.message": "true"
+    "git-widget-placeholder": "main"
   }
 }]]></component>
-  <component name="RecentsManager">
-    <key name="MoveFile.RECENT_KEYS">
-      <recent name="C:\Users\richi\PycharmProjects\edcolonisationplanner" />
-    </key>
-  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -68,79 +54,27 @@
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
-    <task active="true" id="Default" summary="Default task">
-      <changelist id="b884c2f4-d349-4699-b108-d8fe125694c7" name="Changes" comment="" />
-      <created>1742182579985</created>
-      <option name="number" value="Default" />
-      <option name="presentableId" value="Default" />
-      <updated>1742182579985</updated>
-    </task>
-    <task id="LOCAL-00001" summary="the code">
+    <task id="LOCAL-00001" summary="fixed minor mistake">
       <option name="closed" value="true" />
-      <created>1742182821359</created>
+      <created>1744116109337</created>
       <option name="number" value="00001" />
       <option name="presentableId" value="LOCAL-00001" />
       <option name="project" value="LOCAL" />
-      <updated>1742182821359</updated>
+      <updated>1744116109337</updated>
     </task>
-    <task id="LOCAL-00002" summary="Updated with GUI">
-      <option name="closed" value="true" />
-      <created>1742269490078</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
-      <option name="project" value="LOCAL" />
-      <updated>1742269490078</updated>
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0d21201e-d25a-46fe-b172-3f1fc2a892f7" name="Changes" comment="fixed minor mistake" />
+      <created>1744186999842</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1744186999842</updated>
     </task>
-    <task id="LOCAL-00003" summary="Updated with GUI">
-      <option name="closed" value="true" />
-      <created>1742271207119</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
-      <option name="project" value="LOCAL" />
-      <updated>1742271207119</updated>
-    </task>
-    <task id="LOCAL-00004" summary="Added code to bundle cbc solver with pyinstaller exe">
-      <option name="closed" value="true" />
-      <created>1742626629852</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1742626629852</updated>
-    </task>
-    <task id="LOCAL-00005" summary="fixed cbc finder">
-      <option name="closed" value="true" />
-      <created>1742629065619</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
-      <option name="project" value="LOCAL" />
-      <updated>1742629065619</updated>
-    </task>
-    <task id="LOCAL-00006" summary="added expression processing">
-      <option name="closed" value="true" />
-      <created>1743833399875</created>
-      <option name="number" value="00006" />
-      <option name="presentableId" value="LOCAL-00006" />
-      <option name="project" value="LOCAL" />
-      <updated>1743833399875</updated>
-    </task>
-    <task id="LOCAL-00007" summary="added custom objective">
-      <option name="closed" value="true" />
-      <created>1743902065579</created>
-      <option name="number" value="00007" />
-      <option name="presentableId" value="LOCAL-00007" />
-      <option name="project" value="LOCAL" />
-      <updated>1743902065579</updated>
-    </task>
-    <option name="localTasksCounter" value="8" />
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="the code" />
-    <MESSAGE value="Updated with GUI" />
-    <MESSAGE value="Added code to bundle cbc solver with pyinstaller exe" />
-    <MESSAGE value="fixed cbc finder" />
-    <MESSAGE value="added expression processing" />
     <MESSAGE value="added custom objective" />
-    <option name="LAST_COMMIT_MESSAGE" value="added custom objective" />
+    <MESSAGE value="fixed minor mistake" />
+    <option name="LAST_COMMIT_MESSAGE" value="fixed minor mistake" />
   </component>
 </project>

@@ -64,7 +64,7 @@ class MainWindow(ttk.Window):
             "Balance harder": "i^0.2 + m^0.2 + e^0.2 + t^0.2 + w^0.2 + n^0.2 + d^0.2",
             "Balance hardest": "ln(i) + ln(m) + ln(e) + ln(t) + ln(w) + ln(n) + ln(d)",
             "Maximize wealth and tech, ensures wealth is close to 2*tech": "2 * w + t - abs(w - 2 * t)",
-            "maximize security ^ standard of living": "exp(n*ln(e))"
+            "maximize security ^ standard of living": "ln(n) + ln(ln(e))"
         }
         pretext = "Enter your own custom objective function here... (or click the dropdown for examples)"
         self.advanced_objective_pretext = pretext
