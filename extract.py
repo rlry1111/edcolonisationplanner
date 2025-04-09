@@ -52,6 +52,16 @@ class SaveFile:
         self.contents[system][plan] = result
         self.dump()
 
+    def delete_plan(self, system, plan):
+        if system in self.contents and plan in self.contents[system]:
+            del self.contents[system][plan]
+            self.dump()
+
+    def delete_system(self, system):
+        if system in self.contents:
+            del self.contents[system]
+            self.dump()
+
     def dump(self):
         with open(self.filename, "w") as fp:
             json.dump(self.contents, fp, indent=2)
@@ -178,7 +188,7 @@ def insert_into_frame(main_frame, result):
     main_frame.clear_all()
     main_frame.advancedobjective.set(result.get("advanced_objective", False))
     main_frame.direction_input.set(result.get("direction_input", False))
-    main_frame.objectiveinput.set(result.get("objective_input", ""))
+    main_frame.objectiveinput.set(result.get("objective_input", main_frame.advanced_objective_pretext))
     main_frame.adv_solution_value_var.set(result.get("advanced_objective_value", 0))
     main_frame.maximizeinput.set(to_printable(result.get("optimize", "")))
     for score, constraints in result.get("score_constraints", {}).items():
