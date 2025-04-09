@@ -66,7 +66,8 @@ class MainWindow(ttk.Window):
             "Maximize wealth and tech, ensures wealth is close to 2*tech": "2 * w + t - abs(w - 2 * t)",
             "maximize security ^ standard of living": "exp(n*ln(e))"
         }
-        pretext = "Enter your own custom objective function here... \n(or click the dropdown for examples)"
+        pretext = "Enter your own custom objective function here... (or click the dropdown for examples)"
+        self.advanced_objective_pretext = pretext
 
         self.maximizeinput = ttk.StringVar()
         basic_obj_frame = ttk.Frame(self.scroll_frame.scrollable_frame)

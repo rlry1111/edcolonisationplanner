@@ -188,7 +188,7 @@ def insert_into_frame(main_frame, result):
     main_frame.clear_all()
     main_frame.advancedobjective.set(result.get("advanced_objective", False))
     main_frame.direction_input.set(result.get("direction_input", False))
-    main_frame.objectiveinput.set(result.get("objective_input", ""))
+    main_frame.objectiveinput.set(result.get("objective_input", main_frame.advanced_objective_pretext))
     main_frame.adv_solution_value_var.set(result.get("advanced_objective_value", 0))
     main_frame.maximizeinput.set(to_printable(result.get("optimize", "")))
     for score, constraints in result.get("score_constraints", {}).items():
