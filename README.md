@@ -28,17 +28,17 @@ you have already started building in the system select the first station and the
 present buildings. Otherwise you can select "Let the program choose for me" and the app will pick
 the best choice for your first station.
 
-![EDCP screenshot after setting the initial state](screenshots/initial_state.png)
+![EDCP screenshot after setting the initial state](screenshots/initial_state_annotated.png)
 
 Optionally you can set minimum or maximum values in the "System stats" panel. You can also specify
 minimum or maximum numbers for some facility types. 
 
-![EDCP screenshot after setting additional constraints](screenshots/added_constraints.png)
+![EDCP screenshot after setting additional constraints](screenshots/added_constraints_annotated.png)
 
 Then you are ready to hit the "Solve for a system" button and let the solver provide you with a
 solution.
 
-![EDCP screenshot after solving](screenshots/solved.png)
+![EDCP screenshot after solving](screenshots/solved_annotated.png)
 
 If the solution is not to your liking, you can add constraints to force the solver into the right
 direction (limit construction cost, limit how many communication stations you are willing to build,
