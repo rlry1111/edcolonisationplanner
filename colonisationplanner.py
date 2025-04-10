@@ -3,6 +3,7 @@ from platformdirs import user_data_dir
 import sys
 import tkinter
 import threading
+import subprocess
 
 import pyglet
 import ttkbootstrap as ttk
@@ -30,7 +31,7 @@ import import_window
 
 # Main window
 class MainWindow(ttk.Window):
-    def __init__(self, savefile):
+    def __init__(self, data_dir):
         self.original_states = {}
         super().__init__(themename="darkly")
         self.style.configure('.', font=("Eurostile", 12))
@@ -39,7 +40,8 @@ class MainWindow(ttk.Window):
         self.geometry("1000x1000")
         self.building_input = []
         self.port_order = None
-        self.save_file = extract.SaveFile(savefile)
+        self.data_dir = data_dir
+        self.save_file = extract.SaveFile(os.path.join(data_dir, "saved_data.json"))
         w = self.save_file.get_warnings()
         if w:
             print("Warning:", w)
@@ -449,7 +451,11 @@ class MainWindow(ttk.Window):
         frame.pack(pady=7)
 
     def on_file_location(self):
-        os.startfile(data_dir)
+        if sys.platform == "win32":
+            os.startfile(self.data_dir)
+        else:
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.call([opener, self.data_dir])
 
     # Handlers for action buttons: "solve" and "clear result"
     def on_solve(self):
@@ -675,14 +681,13 @@ if __name__ == "__main__":
     if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
         data_dir = user_data_dir("edcolonisationplanner", "")
         os.makedirs(data_dir, exist_ok=True)
-        savefile = os.path.join(data_dir, "saved_data.json")
         font_path = os.path.join(sys._MEIPASS, "eurostile.TTF")
         pyglet.font.add_file(font_path)
     else:
-        savefile = "./saved_data.json"
+        data_dir = "."
         pyglet.font.add_file('eurostile.TTF')
 
-    root = MainWindow(savefile)
+    root = MainWindow(data_dir)
     try:
         root.state('zoomed')
     except tkinter.TclError:
