@@ -1,4 +1,5 @@
 import ttkbootstrap as ttk
+from ttkbootstrap.tooltip import ToolTip
 
 import data
 from data import all_buildings, all_scores, all_categories, all_slots
@@ -45,9 +46,10 @@ class BuildingRow:
         if result_building or firststation:
             self.create_delete_button()
 
-        self.to_build_var.trace_add("write", lambda v, i, c: self.total_var.set(self.to_build_var.get() + self.already_present_var.get()))
+        self.to_build_var.trace_add("write", self.update_total)
         self.name_var.trace_add("write", self.on_choice)
         self.already_present_var.trace_add("write", self.on_set_already_built)
+        self.total_var.trace_add("write", self.set_or_clear_tooltip)
 
         if firststation:
             self.already_present_entry.config(state="readonly")
@@ -87,6 +89,24 @@ class BuildingRow:
         if value > 0:
             self.to_build_entry.config(bootstyle="success")
 
+    def set_or_clear_tooltip(self, *args):
+        nb_total = self.total_var.get()
+        if self.valid and nb_total > 0:
+            building = all_buildings[self.building_name]
+            state = data.SystemState({"already_present": {self.building_name: nb_total}})
+            score_text = ", ".join(f"{data.to_printable(score)}: {state.scores[score]}" for score in data.base_scores
+                                   if state.scores[score] != 0)
+            self.tooltip = ToolTip(self.total_entry, score_text)
+        else:
+            if getattr(self, "tooltip", None):
+                # No way to delete a tooltip, so we just replace the total entry with a new one that has no tooltip
+                idx_in_widgets = self.widgets.index(self.total_entry)
+                self.total_entry.destroy()
+                _, self.total_entry = self.make_int_var_and_entry(modifiable=False, use_variable=self.total_var)
+                self.widgets[idx_in_widgets] = self.total_entry
+                self.pack()
+                self.tooltip = None
+
     def remove_result(self):
         self.to_build_var.set(0)
         self.to_build_entry.config(bootstyle="default")
@@ -113,6 +133,10 @@ class BuildingRow:
 
     def on_set_already_built(self, *_args):
         self.main_frame.update_values_from_building_input()
+        self.update_total()
+
+    def update_total(self, *args):
+        self.total_var.set(self.to_build_var.get() + self.already_present)
 
     def delete(self):
         for w in self.widgets:
@@ -142,8 +166,8 @@ class BuildingRow:
             entry.config(state="readonly")
         return (variable, entry)
 
-    def make_int_var_and_entry(self, modifiable=True, width=7, **kwargs):
-        variable = ttk.IntVar()
+    def make_int_var_and_entry(self, modifiable=True, width=7, use_variable=None, **kwargs):
+        variable = use_variable or ttk.IntVar()
         entry = ttk.Entry(self.parent, textvariable=variable,
                           validate="key", validatecommand=get_vcmd_positive(),
                           width=width, justify=ttk.RIGHT, **kwargs)

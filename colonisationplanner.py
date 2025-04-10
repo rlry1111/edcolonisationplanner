@@ -23,7 +23,6 @@ import import_window
 #TODO
 #   Add port economy (once Fdev fixes it)
 #   Use the "?" canvas in other places
-#   Tooltips on top of each building row showing how much they contribute to scores
 #   New panel allowing to modify the ordering before exporting
 #     * Show the evolution of obj. function / constraints for each building built
 #   Import/export: remember the initial ordering to be able to export it back
