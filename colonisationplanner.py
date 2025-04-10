@@ -444,7 +444,12 @@ class MainWindow(ttk.Window):
         delete_plan_button.pack(padx=5, side="left")
         delete_system_button = ttk.Button(frame, text="Delete system", command=self.on_delete_system, bootstyle="danger")
         delete_system_button.pack(padx=5, side="left")
+        file_location_button = ttk.Button(frame, text="Go to save file location", command=self.on_file_location)
+        file_location_button.pack(padx=5, side="left")
         frame.pack(pady=7)
+
+    def on_file_location(self):
+        os.startfile(data_dir)
 
     # Handlers for action buttons: "solve" and "clear result"
     def on_solve(self):
