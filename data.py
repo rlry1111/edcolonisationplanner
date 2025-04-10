@@ -157,7 +157,7 @@ class SystemState:
             self.add_first_station(solution["first_station"])
         port_order = solution.get("port_order", [])
         for name, nb in solution.get("to_build", {}).items():
-            if port_order and not is_port(all_buildings[name]):
+            if not port_order or not is_port(all_buildings[name]):
                 self.add_building(name, nb)
         for name in port_order:
             self.add_building(name, 1)
@@ -217,7 +217,7 @@ class SystemState:
         for score in base_scores:
             self.scores[score] += getattr(building, score) * nb
         for score in compound_scores:
-            self.scores[score] += compute_compound_score(score, self.scores)
+            self.scores[score] = compute_compound_score(score, self.scores)
 
     def _update_dependencies(self, building_name):
         new_deps = set( dep for dep in self.dependencies_locked
