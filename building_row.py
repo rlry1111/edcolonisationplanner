@@ -3,7 +3,7 @@ from ttkbootstrap.tooltip import ToolTip
 
 import data
 from data import all_buildings, all_scores, all_categories, all_slots
-from tksetup import get_vcmd, get_vcmd_positive, on_focus_out, on_focus_out_integer, get_int_var_value
+from tksetup import get_vcmd, get_vcmd_positive, on_focus_out, on_focus_out_integer, get_int_var_value, Combobox
 
 class BuildingRow:
     def __init__(self, parent, main_frame, firststation=False, result_building=None):
@@ -24,12 +24,12 @@ class BuildingRow:
             values.append("Let the program choose for me")
         else:
             self.category_var = ttk.StringVar(value="All")
-            self.category_choice = ttk.Combobox(self.parent, textvariable=self.category_var,
-                                                width=15, state="readonly", values=list(all_categories.keys()))
+            self.category_choice = Combobox(self.parent, textvariable=self.category_var,
+                                            width=15, state="readonly", values=list(all_categories.keys()))
             self.category_var.trace_add("write", self.on_category_choice)
 
-        self.building_choice = ttk.Combobox(self.parent, textvariable=self.name_var, width=25, state="readonly",
-                                            values=values)
+        self.building_choice = Combobox(self.parent, textvariable=self.name_var, width=25, state="readonly",
+                                        values=values)
         self.already_present_var, self.already_present_entry = self.make_int_var_and_entry()
         self.at_least_var, self.at_least_entry = self.make_var_and_entry()
         self.at_most_var, self.at_most_entry = self.make_var_and_entry()

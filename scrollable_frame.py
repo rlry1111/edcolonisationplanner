@@ -1,5 +1,6 @@
 import tkinter
 import ttkbootstrap as ttk
+import tksetup
 
 class ScrollableFrame(ttk.Frame):
     def __init__(self, container, *args, **kwargs):
@@ -21,11 +22,22 @@ class ScrollableFrame(ttk.Frame):
         container.unbind_class("TCombobox", "<MouseWheel>")
         container.unbind_class("TCombobox", "<ButtonPress-4>")
         container.unbind_class("TCombobox", "<ButtonPress-5>")
+        self.scrolling_stopped = False
 
     def should_scroll(self):
+        if self.scrolling_stopped:
+            return False
+        if any('pressed' in widget.state()
+               for widget in tksetup.Combobox.elements):
+            return False
         canvas_height = self.canvas.winfo_height()
         rows_height = self.canvas.bbox("all")[3]
         return rows_height > canvas_height # only scroll if the rows overflow the frame
+
+    def stop_scrolling(self, *args):
+        self.scrolling_stopped = True
+    def resume_scrolling(self, *args):
+        self.scrolling_stopped = False
 
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))

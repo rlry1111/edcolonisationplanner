@@ -80,3 +80,12 @@ class HelpIndicator(tkinter.Canvas):
         self.create_text(20, 20, text=icon_text, font=("arial", 8, "bold"))
         ToolTip(self, text)
 
+class Combobox(ttk.Combobox):
+    elements = []
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.elements.append(self)
+
+    def destroy(self, *args, **kwargs):
+        super().destroy(*args, **kwargs)
+        self.elements.remove(self)
