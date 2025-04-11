@@ -6,9 +6,6 @@ import re
 import data
 from data import all_buildings, all_scores, all_categories, all_slots
 
-#big M
-M = 1e6
-
 if getattr(sys, "frozen", False) and hasattr(sys, '_MEIPASS'):
     pass #I'm pretty sure pyscipopt's library has its solver inside it (I'll have to check later after using pyinstaller)
 else:
@@ -257,6 +254,7 @@ class Solver:
 
         #sort out dependencies for facilities
         indicator_dependency_variables = {}
+        indicator_2 = {}
         ap_counter = 1
         for target_name, target_building in all_buildings.items():
             if target_building.dependencies:
@@ -265,8 +263,7 @@ class Solver:
                     individual_variables = [ (name, model.addVar(f"indic {name}", vtype="B"))
                                              for name in target_building.dependencies ]
                     for name, bool_var in individual_variables:
-                        model.addCons(all_values[name] <= M * bool_var)
-                        model.addCons(all_values[name] >= bool_var)
+                        model.addConsIndicator(all_values[name] >= 1, binvar=bool_var)
                     if len(target_building.dependencies) == 1:
                         any_positive = individual_variables[0][1]
                     else:
@@ -274,10 +271,11 @@ class Solver:
                         ap_counter += 1
                         for name, bool_var in individual_variables:
                             model.addCons(any_positive >= bool_var)
-                        model.addCons(any_positive <= M * sum(bool_var for name, bool_var in individual_variables))
+                        model.addConsIndicator(sum(bool_var for name, bool_var in individual_variables) >= 1, binvar=any_positive)
                     indicator_dependency_variables[deps] = any_positive
-
-                model.addCons(all_values[target_name] <= M * indicator_dependency_variables[deps])
+                indicator_2[deps] = model.addVar(f"indic 2 {target_name}", vtype="B")
+                model.addCons(indicator_2[deps] == 1 - indicator_dependency_variables[deps])
+                model.addConsIndicator(all_values[target_name] <= 0, binvar=indicator_2[deps])
 
         # Solve the problem
         model.setObjective(objective_var, sense=direction)
