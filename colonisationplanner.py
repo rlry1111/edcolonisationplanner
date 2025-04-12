@@ -13,21 +13,19 @@ import data
 from data import all_buildings, all_scores, all_categories, all_slots
 from building_row import BuildingRow
 from scrollable_frame import ScrollableFrame
-from tksetup import register_validate_commands, get_vcmd, on_focus_out, set_style_if_negative, get_int_var_value, HelpIndicator
+from tksetup import get_vcmd, on_focus_out, get_int_var_value
+import tksetup
 import solver
 import extract
-from threading import Timer
 import export_window
 import import_window
 
 #TODO
 #   Add port economy (once Fdev fixes it)
 #   Use the "?" canvas in other places
-#   Tooltips on top of each building row showing how much they contribute to scores
 #   New panel allowing to modify the ordering before exporting
 #     * Show the evolution of obj. function / constraints for each building built
 #   Import/export: remember the initial ordering to be able to export it back
-#   (minor) fix the annoying behavior with scrolling that also happens when we scroll when selecting in a combobox (or in the text widgets for exporting)
 
 # Main window
 class MainWindow(ttk.Window):
@@ -35,7 +33,7 @@ class MainWindow(ttk.Window):
         self.original_states = {}
         super().__init__(themename="darkly")
         self.style.configure('.', font=("Eurostile", 12))
-        register_validate_commands(self)
+        tksetup.register_validate_commands(self)
         self.title("Elite Dangerous colonisation planner")
         self.geometry("1000x1000")
         self.building_input = []
@@ -87,14 +85,14 @@ class MainWindow(ttk.Window):
         advancedframe = ttk.LabelFrame(containing_frame, text="", padding=2)
 
         help_text = "Set your own custom objective function.\nThe objective function is what the program tries to maximize/minimize (depending on what you select).\nSupported operators:\n+, -, /, *, ^, ln() (natural logarithm), abs() (absolute value), sqrt(), pow(), exp()\n(abs(x) = x if x >= 0, -x if x < 0)\n\nIf brackets are not present, standard order of operations will be followed.\nBrackets after the ln/sgn are required, for the program to recognize what to take the logarithm or sign of.\nSpaces can be placed anywhere.\nType numbers normally.\nNOTE: it is not possible to make a variable the exponent using ^ or pow(). e.g. no w^t. instead, use exp(). e.g. exp(t * ln(w))\n\nUse letters to represent the system scores:\ni: Initial population increase\nm: Maximum population increase\ne: Security\nt: Tech level\nw: Wealth\nn: Standard of living\nd: Development level\nc: Construction cost\n\nExample inputs:\nw*t^2 maximizes/minimizes wealth * (tech level squared)\n(-15*d + ln(exp(w*ln(n))))/c maximizes/minimizes (-15 * development level + ln(standard of living ^ wealth)) / construction cost"
-        helper = HelpIndicator(advancedframe, help_text)
+        helper = tksetup.HelpIndicator(advancedframe, help_text)
         helper.pack(side="right", padx=4, pady=5)
 
         directionframe = ttk.Frame(advancedframe)
         directionswitch = ttk.Checkbutton(directionframe, text="", variable=self.direction_input,
                                           bootstyle="round-toggle", state='disabled')
-        entry = ttk.Combobox(advancedframe, textvariable=self.objectiveinput, width=56,
-                             values=list(self.preset_advanced_objectives.keys()), font="eurostile")
+        entry = tksetup.Combobox(advancedframe, textvariable=self.objectiveinput, width=56,
+                                 values=list(self.preset_advanced_objectives.keys()), font="eurostile")
         entry.bind("<FocusIn>", lambda event: self.objectiveinput.set("") if self.objectiveinput.get() == pretext else None)
         entry.bind("<FocusOut>", lambda event: self.objectiveinput.set(pretext) if self.objectiveinput.get() == "" else None)
         entry.config(state='disabled')
@@ -215,7 +213,7 @@ class MainWindow(ttk.Window):
             result.grid(column=3, row=2+i, padx=5, pady=2)
             result.config(state="readonly")
             self.result_entries[name] = result
-            set_style_if_negative(self.resultvars[name], result)
+            tksetup.set_style_if_negative(self.resultvars[name], result)
 
     # Panel for available construction slots in the system
     def create_slots_panel(self):
@@ -417,10 +415,14 @@ class MainWindow(ttk.Window):
 
     def on_export_button(self):
         result = extract.extract_from_frame(self)
+        self.scroll_frame.stop_scrolling()
         w = export_window.ExportWindow(self, result)
+        w.bind("<Destroy>", self.scroll_frame.resume_scrolling)
 
     def on_import_button(self):
+        self.scroll_frame.stop_scrolling()
         w = import_window.ImportWindow(self)
+        w.bind("<Destroy>", self.scroll_frame.resume_scrolling)
 
     # Panel for Save and Reload actions
     def create_import_export_panel(self):
@@ -428,11 +430,11 @@ class MainWindow(ttk.Window):
         self.system_name_var = ttk.StringVar()
         self.plan_name_var = ttk.StringVar()
         ttk.Label(frame, text="System name:").pack(padx=5, pady=5, side="left")
-        self.system_name_entry = ttk.Combobox(frame, textvariable=self.system_name_var, width=20,
-                                         values=self.save_file.get_system_list())
+        self.system_name_entry = tksetup.Combobox(frame, textvariable=self.system_name_var, width=20,
+                                                  values=self.save_file.get_system_list())
         self.system_name_entry.pack(padx=5, pady=5, side="left")
         ttk.Label(frame, text="Plan name:").pack(padx=5, pady=5, side="left")
-        self.plan_name_entry = ttk.Combobox(frame, textvariable=self.plan_name_var, width=20, values=[])
+        self.plan_name_entry = tksetup.Combobox(frame, textvariable=self.plan_name_var, width=20, values=[])
         self.plan_name_entry.pack(padx=5, pady=5, side="left")
 
         self.system_name_var.trace_add("write", self.on_select_system)
@@ -639,10 +641,10 @@ class MainWindow(ttk.Window):
 
         for slot, nb_used in state.slots_used.items():
             if self.slot_behavior == "fix_available":
-                avail = get_int_var_value(self.available_slots_currently_vars[slot])
+                avail = tksetup.get_int_var_value(self.available_slots_currently_vars[slot])
                 self.total_slots_currently_vars[slot].set(avail + nb_used)
             else:
-                total = get_int_var_value(self.total_slots_currently_vars[slot])
+                total = tksetup.get_int_var_value(self.total_slots_currently_vars[slot])
                 self.available_slots_currently_vars[slot].set(total - nb_used)
 
         if self.auto_construction_points.get():
@@ -671,7 +673,7 @@ class MainWindow(ttk.Window):
                 widget.configure(state=state)
         self.original_states.clear()
 
-class RepeatTimer(Timer):
+class RepeatTimer(threading.Timer):
     def run(self):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
